@@ -3262,9 +3262,11 @@ void SetUp(int ll, double *params, double fny, int NFmax, int *NFS, double *FF, 
     }
     
     flag = 0;
+    if(FF[0] != FF[0]) flag = 1;
     for (i=1; i< NF; i++)
     {
-        if(FF[i] < FF[i-1]) flag = 1;
+        if(FF[i] != FF[i]) flag = 1;
+        if(FF[i] <= FF[i-1]) flag = 1;
     }
     
     // to stop the code from crashing - during the search wierd stuff can happen
@@ -3272,11 +3274,12 @@ void SetUp(int ll, double *params, double fny, int NFmax, int *NFS, double *FF, 
     {
         NF = 10;
         df = fny/10.0;
+        if(df < dfmin) df = dfmin;
         FF[0] = 1.0/Tobs;
         for (i=1; i< NF; i++) FF[i] = FF[i-1]+df;
     }
     
-    //printf("%d\n", NF);
+    printf("%d %d\n", flag, NF);
     
 
     Intrinsic(ll, params, NF, FF, TF, PF, AF, Tobs, Tzero);
