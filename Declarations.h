@@ -97,7 +97,7 @@ double FofT(int ll, double Tobs, double *params, double *frg, double dt, double 
 void Extrinsic(double *params, double Tstart, double Tend, int NF, double *FF, double *TF, double *PF, double *AF, double *AAmp, double *EAmp, double *APhase, double *EPhase, double *kxm);
 void efix(struct Data *dat, struct Het *het, int hr, int ll, double *params, double *min, double *max, double *eval, double **evec, double zs);
 void het_space(struct Data *dat, struct Het *het, int ll, double *params, double *min, double *max);
-
+void instrument_noise(double f, double *SAE);
 void getfreq(double Tend, double *fnew, double *tf, double *Amp, double *Phase, double t, double fguess, double phic, double fRef_in, double m1_SI, double m2_SI, double chi1, double chi2, double distance, double tc);
 void MCMC(struct Data *dat, struct Het *het, int ll, int *who, double **params);
 void update(struct Data *dat, struct Het *het, int typ, int k, int ll, double *logLx, double **paramx, double **paramy, double **sx, double **sy, double *min, double *max, int *who, double *heat, double ***history, int NH, double **ejump, double ***evec, int **cv, int **av, gsl_rng *r);
