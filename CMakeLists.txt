@@ -22,7 +22,5 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffast-math -Wall -O3 -ftree-vectorize -std=
 add_library(mbh STATIC Utils.c IMRPhenomD.c IMRPhenomD_internals.c Response.c IMRPhenomD.h IMRPhenomD_internals.h Declarations.h Constants.h)
 include_directories(SYSTEM ${GSL_INCLUDE_DIRS})
 target_link_libraries(mbh ${GSL_LIBRARIES} m)
-set_target_properties(mbh PROPERTIES PUBLIC_HEADER "IMRPhenomD.h;IMRPhenomD_internals.h;Declarations.h;Constants.h")
-#install(TARGETS mbh DESTINATION lib)
-#install(DIRECTORY "./" DESTINATION include "IMRPhenomD.h;IMRPhenomD_internals.h;Declarations.h;Constants.h")
+set_target_properties(mbh PROPERTIES PUBLIC_HEADER "mbh.h;IMRPhenomD.h;IMRPhenomD_internals.h;Declarations.h;Constants.h")
 install(TARGETS mbh LIBRARY DESTINATION lib PUBLIC_HEADER DESTINATION include)

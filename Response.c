@@ -1,5 +1,3 @@
-#include "Constants.h"
-#include "IMRPhenomD.h"
 #include <gsl/gsl_spline.h>
 #include <gsl/gsl_fft_real.h>
 #include <gsl/gsl_fft_halfcomplex.h>
@@ -9,7 +7,7 @@
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 #include <time.h>
-#include "Declarations.h"
+#include "mbh.h"
 
 void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, double *min, double *max)
 {

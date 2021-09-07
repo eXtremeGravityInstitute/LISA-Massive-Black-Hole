@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "Constants.h"
-#include "IMRPhenomD.h"
 #include <gsl/gsl_spline.h>
 #include <gsl/gsl_fft_real.h>
 #include <gsl/gsl_fft_halfcomplex.h>
@@ -34,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <time.h>
 #include <omp.h>
 
-#include "Declarations.h"
+#include "mbh.h"
 
 #ifndef _OPENMP
 #define omp ignore

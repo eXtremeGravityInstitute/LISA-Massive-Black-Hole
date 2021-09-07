@@ -1,5 +1,3 @@
-#include "Constants.h"
-#include "IMRPhenomD.h"
 #include <gsl/gsl_spline.h>
 #include <gsl/gsl_fft_real.h>
 #include <gsl/gsl_fft_halfcomplex.h>
@@ -8,7 +6,7 @@
 #include <gsl/gsl_cblas.h>
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
-#include "Declarations.h"
+#include "mbh.h"
 
 int *int_vector(int N)
 {
