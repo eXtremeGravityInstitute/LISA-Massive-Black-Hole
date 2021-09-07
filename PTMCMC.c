@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <gsl/gsl_randist.h>
 
 #include <time.h>
+#include <omp.h>
 
 #include "Declarations.h"
 
@@ -75,7 +76,7 @@ int main(int argc,char **argv)
   double HHA, HDA, DDA, HHE, HDE, DDE, MA, ME;
     
   struct Het *het   = malloc(sizeof(struct Het));
-  struct Data *dat  = malloc(sizeof(struct Data));
+    struct MBH_Data *dat  = malloc(sizeof(struct MBH_Data));
     
   double *AC, *EC, *TC;
     
@@ -304,7 +305,7 @@ int main(int argc,char **argv)
     
 }
 
-void MCMC(struct Data *dat, struct Het *het, int ll, int *who, double **paramx)
+void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **paramx)
 {
     double *AAmp, *EAmp, *APhase, *EPhase;
     double kxm, *logLx, logLy, SNR, x, y, z, Lref, fc, fe;
@@ -899,7 +900,7 @@ void MCMC(struct Data *dat, struct Het *het, int ll, int *who, double **paramx)
     
 }
 
-void update(struct Data *dat, struct Het *het, int typ, int k, int ll, double *logLx, double **paramx, double **paramy, double **sx, double **sy, double *min, double *max, int *who, double *heat, double ***history, int NH, double **ejump, double ***evec, int **cv, int **av, gsl_rng *r)
+void update(struct MBH_Data *dat, struct Het *het, int typ, int k, int ll, double *logLx, double **paramx, double **paramy, double **sx, double **sy, double *min, double *max, int *who, double *heat, double ***history, int NH, double **ejump, double ***evec, int **cv, int **av, gsl_rng *r)
 {
     int q, i, j;
     int fstat;

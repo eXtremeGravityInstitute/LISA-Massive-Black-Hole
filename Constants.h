@@ -41,7 +41,7 @@
 #define G 6.67259e-11
 
  /* Astronomical unit (meters) */
-#define AU 1.49597870660e11
+#define au 1.49597870660e11
 
  /* Number of meters in a parsec */
 #define pc 3.0856775807e16
@@ -56,7 +56,7 @@
 #define Msun 1.9889e30
 
 /* Mass of the Sun (s) */
-#define TSUN 4.92569043916e-6
+#define Tsun 4.92569043916e-6
 
 #define h22fac  0.31539156525252   //  2.*sqrt(5./(64.*PI)) factor for h22 to h conversion
 
@@ -81,7 +81,7 @@
 #define lambda0 0.0
 
  /* Orbital radius of the guiding center */
-#define Rgc (1.0*AU)
+#define Rgc (1.0*au)
 
  /* Mean arm length of the LISA detector (meters) */
 #define Larm 2.5e9

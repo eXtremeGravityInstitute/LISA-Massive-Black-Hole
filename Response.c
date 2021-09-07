@@ -11,32 +11,25 @@
 #include <time.h>
 #include "Declarations.h"
 
-void het_space(struct Data *dat, struct Het *het, int ll, double *params, double *min, double *max)
+void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, double *min, double *max)
 {
-    int i, id, j, k, ii, jj, kk, MN, MM, jmin, flag, djmax, N, M, J, NR;
-    int jmid, boost;
+    int i, id, j, k, ii, jj, kk, MN, MM, jmin, flag, N, M, J, NR;
+    int jmid;
     int pflag;
     double **Ar, ***Ap, **Pr, ***Pp;
     double ***Cs, ***Sn, ***DH;
     double *dfa;
     double *fgrid;
-    double fstop;
-    char filename[1024];
-    double k0, k1, k2;
-    double norm0, norm1;
-    double x, y, z;
-    double tol, tl, tola, tla;
+    double x;
+    double tol, tl;
     double cmid, smid, dmid;
     FILE *out;
-    double *ratio;
-    int *stst;
-    double **fisher, **cov;
+    double **fisher;
     double **evec, *eval;
     double **dparams, *px;
-    double alpha0, z0, zs, alphanew;
+    double alpha0=0.0;
     double leta, eta;
-    double alphax, dz, LDLmin, Lmax;
-    double kxm, dfmax;
+    double dfmax;
     
     N = dat->N;
     
@@ -147,9 +140,7 @@ void het_space(struct Data *dat, struct Het *het, int ll, double *params, double
     TF = (double*)malloc(sizeof(double)* (NF));
     PF = (double*)malloc(sizeof(double)* (NF));
     AF = (double*)malloc(sizeof(double)* (NF));
-    
-    double phic, tc;
-    
+        
     // reference amplitude and phase
     fullphaseamp(dat, ll, NF, params, FF, Ar[0], Ar[1], Pr[0], Pr[1]);
     
@@ -406,14 +397,13 @@ void het_space(struct Data *dat, struct Het *het, int ll, double *params, double
     
 }
 
-void fullphaseamp(struct Data *dat, int ll, int K, double *params, double *freq, double *Aamp, *Eamp, *Aphase, *Ephase)
+void fullphaseamp(struct MBH_Data *dat, int ll, int K, double *params, double *freq, double *Aamp, double *Eamp, double *Aphase, double *Ephase)
 {
     // full frequency template, amplitude and phase
     
     int i;
     double tc, phic, kxm;
     double *TF, *PF, *AF;
-    FILE *out;
     
     TF = (double*)malloc(sizeof(double)* (K));
     PF = (double*)malloc(sizeof(double)* (K));
@@ -460,21 +450,18 @@ void freehet(struct Het *het)
     free_double_vector(het->DD);
 }
 
-void heterodyne(struct Data *dat, struct Het *het, int ll, double *params)
+void heterodyne(struct MBH_Data *dat, struct Het *het, int ll, double *params)
 {
     int i, id, j, k, n;
-    double f, fstop, x, y, z;
+    double x;
     double **hb, **rb, **ampb, **phaseb;
     double cp, sp;
     double Tobs;
     double **RC, **RS, **AA;
     double **DC, **DS;
     double logL, HH, HR;
-    double kxm;
-    double phic, tc, dt;
-    int M, N, MM, MN, NR, ds, J, U;
+    int M, N, MM, MN, NR, J, U;
     int Nch = het->Nch;
-    FILE *out;
     
     M = het->M;
     MM = het->MM;
@@ -738,13 +725,12 @@ void heterodyne(struct Data *dat, struct Het *het, int ll, double *params)
 }
 
 
-double log_likelihood_het(struct Data *dat, struct Het *het, int ll, double *params, double *sx)
+double log_likelihood_het(struct MBH_Data *dat, struct Het *het, int ll, double *params, double *sx)
 {
     double **amp, **phase;
     double **hc, **hs;
     double HH, HR, logL;
     double x, y;
-    double L0,L1;
     double **cc, **ss;
     double *uu, *vv;
     int i, j, k, id, M, J, NR;
@@ -904,23 +890,21 @@ double log_likelihood_het(struct Data *dat, struct Het *het, int ll, double *par
     
 }
 
-double Fstat_het(struct Data *dat, struct Het *het, int ll, double *params, double *sx, double tm)
+double Fstat_het(struct MBH_Data *dat, struct Het *het, int ll, double *params, double *sx, double tm)
 {
     double ***amp, ***phase;
     double **Fparams;
-    double HH, HR, logL;
+    double logL;
     double cosi, scale, psi, phic, Ac, Ap, A;
     double x, y, u, v;
     double QQ;
-    double L0,L1,tx;
+    double tx;
     double ***cc, ***ss;
     double *uu, *vv;
     int i, j, k, id, M, J, NR;
     int ii, jj;
     int Nch = het->Nch;
-    
-    FILE *out;
-    
+        
     logL = 0.0;
     
     if(lhold == 0)
@@ -1215,14 +1199,13 @@ double Fstat_het(struct Data *dat, struct Het *het, int ll, double *params, doub
 }
 
 // Uses the full data (slow)
-void FstatFull(struct Data *dat, int ll, double *params, double *pnew)
+void FstatFull(struct MBH_Data *dat, int ll, double *params, double *pnew)
 {
     
     /*   Indicies   */
-    int i,j, k, n, m, imax;
+    int i, j;
     
     /*   Miscellaneous  */
-    double xm, fstep, power, om, mx, tx;
     
     double *pfilt;
     
@@ -1231,37 +1214,18 @@ void FstatFull(struct Data *dat, int ll, double *params, double *pnew)
     double **MM, **MI;
     
     double *NV, *aV;
+            
+    double A;
     
-    double AR, AI, ER, EI;
-    
-    double t, f, kdotx, Amp, Phase, Fp, Fc;
-    
-    double A, P, px, tc, tcs, pxi, pxj;
-    
-    double x, y, u, v, xold, yold;
-    
-    double cp, sp;
-    
-    int NA, flag;
-    
-    double cx, sx, logL, logLmax;
-    
-    int nn;
-    
-    double iota, cosi;
+    double x, y, u, v;
+            
+    double logL;
+        
+    double cosi;
     double Ap, Ac, scale;
     
-    double a1, a2, a3, a4;
-    double cpsi, spsi;
     double psi, phic;
-    double cpc, spc;
-    
-    FILE *out;
-    
-    
-    clock_t start, end;
-    double cpu_time_used;
-    
+        
     pfilt = (double*)malloc(sizeof(double)* (NP));
     
     filtA = double_matrix(4,dat->N);
@@ -1422,19 +1386,13 @@ void FstatFull(struct Data *dat, int ll, double *params, double *pnew)
 
 
 
-double SNRFast(struct Data *dat, int ll, double *params)
+double SNRFast(struct MBH_Data *dat, int ll, double *params)
 {
     double *AAmp, *EAmp, *APhase, *EPhase;
-    double af, fr, df, DT, fac, deltaF, f, fmax, fmin, x, y, t, t10;
-    double m1, m2, chi1, chi2, Mtot, Mc, eta;
-    double Amp, Phase, tf, fguess, kxm;
-    double m1_SI, m2_SI, distance, tc, phic;
-    int i, j, NF, NW, flag;
-    double A, P;
+    double kxm;
+    int i, j, NF;
     double SNR;
-    double px, fnew;
     double *Aint, *Eint;
-    double *SNRSQA, *SNRSQE;
 
     FILE *out;
     
@@ -1633,7 +1591,7 @@ void Extrinsic(double *params, double Tstart, double Tend, int NF, double *FF, d
 {
     
     /*   Indicies   */
-    int i,j, k, n, m;
+    int n;
     
     /*   Time and distance variables   */
     double *xi;
@@ -1643,26 +1601,16 @@ void Extrinsic(double *params, double Tstart, double Tend, int NF, double *FF, d
     double ja, je;
     
     /*   Miscellaneous  */
-    double xm, fstep, power, om, mx, tx, x;
+    double x;
     
-    double *ta, *xia;
     double *FpAR, *FcAR, *FpER, *FcER;
     double *FpAI, *FcAI, *FpEI, *FcEI;
     
     double t, f, kdotx, Amp, Phase, RR, II;
-    
-    int NA, flag;
-    
-    double iota, cosi;
+        
+    double cosi;
     double Aplus, Across;
-    
-    double Tcut;
-    
-    clock_t start, end;
-    double cpu_time_used;
-    
-    FILE *out;
-    
+        
     
     xi = (double*)malloc(sizeof(double)* (NF));
     FpAR = (double*)malloc(sizeof(double)* (NF));
@@ -1791,21 +1739,15 @@ void Extrinsic(double *params, double Tstart, double Tend, int NF, double *FF, d
 }
 
 
-void SetUp(struct Data *dat, int ll, double *params, int NFmax, int *NFS, double *FF)
+void SetUp(struct MBH_Data *dat, int ll, double *params, int NFmax, int *NFS, double *FF)
 {
-    double af, fr, df, DT, fac, deltaF, f, fmax, fmin, x;
-    double m1, m2, chi1, chi2, Mtot, Mc, eta, dm;
-    double Amp, Phase, tf, fguess;
-    double m1_SI, m2_SI, distance, tc, phic, told;
-    int i, ii, NF;
-    double A, P;
-    double px, fnew, fonfs;
-    double t, tx;
+    double fr, df, DT, fac, f, fmax, fmin;
+    double m1, m2,Mtot, Mc, eta, dm;
+    double distance, tc;
+    int i, NF;
     double dfmin, dfmax;
-    
-    double fRef_in=PDfref;
-    
-    int ret, flag, flag1, flag2;
+        
+    int flag;
     
     // This subroutine sets up the frequency sample array, the time-frequency map and finds the PhenomD amplitude and phase
     
@@ -1813,8 +1755,8 @@ void SetUp(struct Data *dat, int ll, double *params, int NFmax, int *NFS, double
     
     if(ll == 0)  // linear in m1, m2
     {
-    m1 = params[0]*TSUN;    // Mass1
-    m2 = params[1]*TSUN;    // Mass2
+    m1 = params[0]*Tsun;    // Mass1
+    m2 = params[1]*Tsun;    // Mass2
     distance = params[6]*1.0e9*PC_SI; // distance
     Mtot = (m1+m2);
     eta = m1*m2/((m1+m2)*(m1+m2));
@@ -1822,8 +1764,8 @@ void SetUp(struct Data *dat, int ll, double *params, int NFmax, int *NFS, double
     }
     else if(ll == 1)  // log in m1, m2
     {
-     m1 = exp(params[0])*TSUN;    // Mass1
-     m2 = exp(params[1])*TSUN;    // Mass2
+     m1 = exp(params[0])*Tsun;    // Mass1
+     m2 = exp(params[1])*Tsun;    // Mass2
      distance = exp(params[6])*1.0e9*PC_SI; // distance
      Mtot = (m1+m2);
      eta = m1*m2/((m1+m2)*(m1+m2));
@@ -1832,8 +1774,8 @@ void SetUp(struct Data *dat, int ll, double *params, int NFmax, int *NFS, double
     else // log in Mc, Mt
     {
     distance = exp(params[6])*1.0e9*PC_SI; // distance
-    Mc = exp(params[0])*TSUN;
-    Mtot = exp(params[1])*TSUN;
+    Mc = exp(params[0])*Tsun;
+    Mtot = exp(params[1])*Tsun;
     eta = pow((Mc/Mtot), (5.0/3.0));
      if(eta > 0.25)
      {
@@ -1936,18 +1878,14 @@ void SetUp(struct Data *dat, int ll, double *params, int NFmax, int *NFS, double
 
 
 // This uses the smooth component of the power spectra
-void FisherFast(struct Data *dat, int ll, double *params, double **Fisher)
+void FisherFast(struct MBH_Data *dat, int ll, double *params, double **Fisher)
 {
     double *AAmp, *EAmp, *APhase, *EPhase, *TF, *FF, *PF, *AF;
     double *PFref, *AFref, *TFref;
-    double af, fr, df, DT, fac, deltaF, f, fmin, x, t;
-    double m1, m2, chi1, chi2, Mtot, Mc, eta;
-    double Amp, Phase, tf, fguess;
-    double m1_SI, m2_SI, distance, tc, phic;
+    double x;
     double *paramsP, *paramsM;
-    int i, j, k, ii, NF, NW, lx;
-    double A, P;
-    double px, fnew, kxm;
+    int i, j, k, NF;
+    double kxm;
     double *Aint, *Eint, *SADS, *SEDS;
     double *AphaseP, *AphaseM, *AampP, *AampM;
     double *EphaseP, *EphaseM, *EampP, *EampM;
@@ -1957,9 +1895,7 @@ void FisherFast(struct Data *dat, int ll, double *params, double **Fisher)
     double Tstart, Tend, Tobs;
     
     int NFmax = 100000;
-    
-    int kmin, kmax, flag;
-    
+        
     Tstart = dat->Tstart;
     Tend = dat->Tend;
     Tobs = dat->Tobs;
@@ -2240,20 +2176,15 @@ void FisherFast(struct Data *dat, int ll, double *params, double **Fisher)
     
 }
 
-void FisherHet(struct Data *dat, struct Het *het, int ll, double *params, double **Fisher)
+void FisherHet(struct MBH_Data *dat, struct Het *het, int ll, double *params, double **Fisher)
 {
-    double af, fr, df, DT, fac, deltaF, f, fmin, x, t;
-    double m1, m2, chi1, chi2, Mtot, Mc, eta;
-    double Amp, Phase, tf, fguess;
-    double m1_SI, m2_SI, distance, tc, phic;
+    double x;
     double *paramsP, *paramsM;
-    int i, j, k, ii, jj, kk, NF, NW, lx;
-    double A, P;
-    double px, fnew, kxm;
+    int i, j, k, ii, jj, kk;
     double *epsilon;
     double Tstart, Tend, Tobs;
 
-    int kmin, kmax, flag, Nch;
+    int Nch;
     
     int M, J, NR, id;
     double HH;
@@ -2439,20 +2370,15 @@ void FisherHet(struct Data *dat, struct Het *het, int ll, double *params, double
     
 }
 
-void FisherSubHet(struct Data *dat, struct Het *het, int ll, int *pmap, double *params, double **Fisher)
+void FisherSubHet(struct MBH_Data *dat, struct Het *het, int ll, int *pmap, double *params, double **Fisher)
 {
-    double af, fr, df, DT, fac, deltaF, f, fmin, x, t;
-    double m1, m2, chi1, chi2, Mtot, Mc, eta;
-    double Amp, Phase, tf, fguess;
-    double m1_SI, m2_SI, distance, tc, phic;
+    double x;
     double *paramsP, *paramsM;
-    int i, j, k, ii, jj, kk, NF, NW, lx;
-    double A, P;
-    double px, fnew, kxm;
+    int i,j,k,ii,jj,kk;
     double *epsilon;
     double Tstart, Tend, Tobs;
 
-    int kmin, kmax, flag, Nch;
+    int Nch;
     
     int M, J, NR, id;
     double HH;
@@ -2654,18 +2580,14 @@ void FisherSubHet(struct Data *dat, struct Het *het, int ll, int *pmap, double *
 }
 
 
-void FisherSub(struct Data *dat, int ll, int *pmap, double *params, double **Fisher)
+void FisherSub(struct MBH_Data *dat, int ll, int *pmap, double *params, double **Fisher)
 {
     double *AAmp, *EAmp, *APhase, *EPhase, *TF, *FF, *PF, *AF;
     double *PFref, *AFref, *TFref;
-    double af, fr, df, DT, fac, deltaF, f, fmin, x, t;
-    double m1, m2, chi1, chi2, Mtot, Mc, eta;
-    double Amp, Phase, tf, fguess;
-    double m1_SI, m2_SI, distance, tc, phic;
+    double x;
     double *paramsP, *paramsM;
-    int i, j, k, ii, NF, NW;
-    double A, P;
-    double px, fnew, kxm;
+    int i, j, k, NF;
+    double kxm;
     double *Aint, *Eint, *SADS, *SEDS;
     double *AphaseP, *AphaseM, *AampP, *AampM;
     double *EphaseP, *EphaseM, *EampP, *EampM;
@@ -2675,9 +2597,7 @@ void FisherSub(struct Data *dat, int ll, int *pmap, double *params, double **Fis
     double Tstart, Tend, Tobs;
     
     int NFmax = 100000;
-    
-    int kmin, kmax, flag;
-    
+        
     Tstart = dat->Tstart;
     Tend = dat->Tend;
     Tobs = dat->Tobs;
@@ -2988,21 +2908,14 @@ void FisherSub(struct Data *dat, int ll, int *pmap, double *params, double **Fis
     
 }
 
-void FisherDirect(struct Data *dat, int ll, double *params, double **Fisher)
+void FisherDirect(struct MBH_Data *dat, int ll, double *params, double **Fisher)
 {
-    double af, fr, df, DT, fac, deltaF, f, fmin, x, t;
-    double m1, m2, chi1, chi2, Mtot, Mc, eta;
-    double Amp, Phase, tf, fguess;
-    double m1_SI, m2_SI, distance, tc, phic;
+    double x;
     double *paramsP, *paramsM;
-    int i, j, k, ii, NF, NW, lx, N;
-    double A, P;
-    double px, fnew, kxm;
+    int i, j, N;
     double *epsilon;
     double **AH, **AP, **AM;
     double **EH, **EP, **EM;
-    
-    int kmin, kmax, flag;
     
     N = dat->N;
 
@@ -3111,10 +3024,9 @@ void FisherDirect(struct Data *dat, int ll, double *params, double **Fisher)
 
 
 
-double chisq(struct Data *dat, int ll, double *params, double *AR, double *ER)
+double chisq(struct MBH_Data *dat, int ll, double *params, double *AR, double *ER)
 {
     double *AS, *ES;
-    double HH, HD;
     double csq;
     int i;
     
@@ -3139,11 +3051,11 @@ double chisq(struct Data *dat, int ll, double *params, double *AR, double *ER)
     
 }
 
-void efix(struct Data *dat, int ll, double *params, double *min, double *max, double *eval, double **evec, double zs)
+void efix(struct MBH_Data *dat, int ll, double *params, double *min, double *max, double *eval, double **evec, double zs)
 {
-    int i, j, k, flag;
+    int i, j, k;
     double alpha0, x, z, z0, alpha, alphanew;
-    double dz, alphax;
+    double dz;
     double leta, eta;
     double zmx, zmn;
     double dzmin, alpham, zm;
@@ -3237,7 +3149,7 @@ void efix(struct Data *dat, int ll, double *params, double *min, double *max, do
           
           k++;
           
-      } while ( (z0 > zmx || z0 < zmn) && k < 15 && fabs(alpha0 < 1.0e4));
+      } while ( (z0 > zmx || z0 < zmn) && k < 15 && fabs(alpha0) < 1.0e4);
       
       
       alpha = alpha0*1.1;
@@ -3313,7 +3225,7 @@ void efix(struct Data *dat, int ll, double *params, double *min, double *max, do
  
              k++;
              
-        } while (fabs(z-zs) > 0.2 && k < 10 && fabs(alpha < 1.0e4));
+        } while (fabs(z-zs) > 0.2 && k < 10 && fabs(alpha) < 1.0e4);
          
           // printf("F %f %f\n", alpham, zm);
          
@@ -3333,7 +3245,7 @@ void efix(struct Data *dat, int ll, double *params, double *min, double *max, do
     
 }
 
-double Likelihood_check(struct Data *dat, struct Het *het, int ll, double *params)
+double Likelihood_check(struct MBH_Data *dat, struct Het *het, int ll, double *params)
 {
     double *AS, *ES;
     double HH, HD;
@@ -3362,7 +3274,7 @@ double Likelihood_check(struct Data *dat, struct Het *het, int ll, double *param
     
 }
 
-double SNRstart(struct Data *dat, int ll, double *params)
+double SNRstart(struct MBH_Data *dat, int ll, double *params)
 {
     double *AS, *ES;
     double HH;
@@ -3403,7 +3315,7 @@ double SNRstart(struct Data *dat, int ll, double *params)
     
 }
 
-double Likelihood(struct Data *dat, int ll, double *params)
+double Likelihood(struct MBH_Data *dat, int ll, double *params)
 {
     double *AS, *ES;
     double HH, HD;
@@ -3428,14 +3340,11 @@ double Likelihood(struct Data *dat, int ll, double *params)
     
 }
 
-double Likelihood_Slow(struct Data *dat, int ll, double *params)
+double Likelihood_Slow(struct MBH_Data *dat, int ll, double *params)
 {
-    int i;
     double *AS, *ES;
     double HH, HD;
-    double AA, EE;
     double logL;
-    FILE *out;
     
     AS = (double*)malloc(sizeof(double)* (dat->N));
     ES = (double*)malloc(sizeof(double)* (dat->N));
@@ -3454,54 +3363,44 @@ double Likelihood_Slow(struct Data *dat, int ll, double *params)
     
 }
 
-void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *ES)
+void ResponseFreq(struct MBH_Data *dat, int ll, double *params, double *AS, double *ES)
 {
     
     /*   Indicies   */
-    int i,j, k, n, m, a, M, nn, nmin, nmax;
+    int i, n, m, nn;
     
     /*   GW Source data   */
-    double Mc, theta, phi, psi, D, iota, A, Aplus, Across, f0, fdot, phio;
-    double costh, sinth, cosph, sinph, cosi, cosps, sinps;
+    double Mc, Aplus, Across;
+    double cosi;
     
     /*   Time and distance variables   */
     double xi, t;
     
     /*   Miscellaneous  */
-    double xm, fstep, power, om, mx;
-    
     double Amp, Phase, fonfs, f, x;
+        
+    double HC, HS, Tobs;
     
-    double Aprime, Pprime, fi, fend;
-    
-    double HC, HS, hp, hc, Tobs;
-    
-    double m1, m2, chi1, chi2, phic, tc, distance, Mtot, eta, dm, fr, af;
+    double m1, m2, chi1, chi2, phic, tc, distance, Mtot, eta, dm, fr;
     
     double *ta, *xia, *FF;
     
-    double Fp, Fc, kdotx, delt, fmin, fmax;
-    
-    double XR, XI, YR, YI, ZR, ZI;
-    
-    double fstart, fstop, Tcut, fref;
+    double kdotx, fmin, fmax;
+        
+    double fstart, fstop;
     
     double sqrtTobs;
     
     int nfmin, nfmax, nf;
     
-    int NA, N;
+    int N;
     
-    clock_t start, end;
-    double cpu_time_used;
     
     double m1_SI, m2_SI, deltaF;
     
     double *FpAR, *FpAI, *FcAR, *FcAI;
     double *FpER, *FpEI, *FcER, *FcEI;
-    
-    FILE *out;
-    
+        
     N = dat->N;
     Tobs = dat->Tobs;
     sqrtTobs = dat->sqrtTobs;
@@ -3522,8 +3421,8 @@ void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *
     
     if(ll == 0)  // linear in m1, m2
     {
-    m1 = params[0]*TSUN;    // Mass1
-    m2 = params[1]*TSUN;    // Mass2
+    m1 = params[0]*Tsun;    // Mass1
+    m2 = params[1]*Tsun;    // Mass2
     distance = params[6]*1.0e9*PC_SI; // distance
     Mtot = (m1+m2);
     eta = m1*m2/((m1+m2)*(m1+m2));
@@ -3531,8 +3430,8 @@ void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *
     }
     else if(ll == 1)  // log in m1, m2
     {
-     m1 = exp(params[0])*TSUN;    // Mass1
-     m2 = exp(params[1])*TSUN;    // Mass2
+     m1 = exp(params[0])*Tsun;    // Mass1
+     m2 = exp(params[1])*Tsun;    // Mass2
      distance = exp(params[6])*1.0e9*PC_SI; // distance
      Mtot = (m1+m2);
      eta = m1*m2/((m1+m2)*(m1+m2));
@@ -3541,8 +3440,8 @@ void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *
     else // log in Mc, Mt
     {
     distance = exp(params[6])*1.0e9*PC_SI; // distance
-    Mc = exp(params[0])*TSUN;
-    Mtot = exp(params[1])*TSUN;
+    Mc = exp(params[0])*Tsun;
+    Mtot = exp(params[1])*Tsun;
     eta = pow((Mc/Mtot), (5.0/3.0));
      if(eta > 0.25)
      {
@@ -3556,8 +3455,8 @@ void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *
     m2 = Mtot*(1.0-dm)/2.0;
     }
     
-    m1_SI = m1*MSUN_SI/TSUN;
-    m2_SI = m2*MSUN_SI/TSUN;
+    m1_SI = m1*MSUN_SI/Tsun;
+    m2_SI = m2*MSUN_SI/Tsun;
 
     chi1 = params[2];  // Spin1
     chi2 = params[3];  // Spin2
@@ -3571,7 +3470,7 @@ void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *
     AmpPhaseFDWaveform *ap = NULL;
     double fRef_in;
     double *AF, *TF;
-    int ret, flag1, flag2;
+    int ret;
     
     AF = (double*)malloc(sizeof(double)* (N/2));
     TF = (double*)malloc(sizeof(double)* (N/2));
@@ -3717,25 +3616,22 @@ void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *
 }
 
 
-void ResponseFast(struct Data *dat, int ll, double *params, double *AS, double *ES)
+void ResponseFast(struct MBH_Data *dat, int ll, double *params, double *AS, double *ES)
 {
     double *AAmp, *EAmp, *APhase, *EPhase;
     double *APC, *APS, *EPC, *EPS;
-    double af, fr, df, DT, fac, deltaF, f, fmax, fmin, x;
-    double m1, m2, chi1, chi2, Mtot, Mc, eta;
-    double Amp, Phase, tf, fguess, kxm;
-    double m1_SI, m2_SI, distance, tc, phic;
+    double f;
+    double kxm;
+    double tc, phic;
     double cp, sp, cpx, spx;
     int i, NF;
-    double A, P;
-    double px, fnew;
+    double A;
+    double px;
     
     int NFmax = 100000;
     
     double *AF, *PF, *FF, *TF;
-    
-    FILE *out;
-    
+        
     FF = (double*)malloc(sizeof(double)* (NFmax));
     
     SetUp(dat, ll, params, NFmax, &NF, FF);
@@ -3895,8 +3791,7 @@ void timearray(double *params, RealVector *freq, long N, double *TF, AmpPhaseFDW
     
     int flag;
     int i, j;
-    double v;
-    double tc,  deltaF, fmax;
+    double tc;
     
     tc = params[5];    // merger time
 
@@ -3933,12 +3828,9 @@ void timearray(double *params, RealVector *freq, long N, double *TF, AmpPhaseFDW
 void StartStop(int ll, double *params, double Tstart, double Tend, double dt, double *fstart, double *fstop, double *frg)
 {
     
-    double m1, m2, m1_SI, m2_SI, chi1, chi2, tc, dm;
-    double Mtot, eta, Mc, af, fr;
-    double Amp, Phase, distance;
+    double fr;
     double fmin, fmax;
-    double fnew, tf, fny, Tseg;
-    int i;
+    double Tseg;
     
     Tseg = Tend-Tstart;
     
@@ -3972,7 +3864,7 @@ void Intrinsic(int ll, double *params, double Tobs, int NF, double *FF, double *
     RealVector *freq;
     
     double m1, m2, chi1, chi2, Mtot, Mc;
-    double m1_SI, m2_SI, distance, tc, phic;
+    double m1_SI, m2_SI, distance, tc;
     double eta, dm, fx;
     
     double af, fr, dtdf, sqrtTobs;
@@ -3986,8 +3878,8 @@ void Intrinsic(int ll, double *params, double Tobs, int NF, double *FF, double *
     
     if(ll == 0)  // linear in m1, m2
     {
-    m1 = params[0]*TSUN;    // Mass1
-    m2 = params[1]*TSUN;    // Mass2
+    m1 = params[0]*Tsun;    // Mass1
+    m2 = params[1]*Tsun;    // Mass2
     distance = params[6]*1.0e9*PC_SI; // distance
     Mtot = (m1+m2);
     eta = m1*m2/((m1+m2)*(m1+m2));
@@ -3995,8 +3887,8 @@ void Intrinsic(int ll, double *params, double Tobs, int NF, double *FF, double *
     }
     else if(ll == 1)  // log in m1, m2
     {
-     m1 = exp(params[0])*TSUN;    // Mass1
-     m2 = exp(params[1])*TSUN;    // Mass2
+     m1 = exp(params[0])*Tsun;    // Mass1
+     m2 = exp(params[1])*Tsun;    // Mass2
      distance = exp(params[6])*1.0e9*PC_SI; // distance
      Mtot = (m1+m2);
      eta = m1*m2/((m1+m2)*(m1+m2));
@@ -4004,8 +3896,8 @@ void Intrinsic(int ll, double *params, double Tobs, int NF, double *FF, double *
     }
     else // log in Mc, Mt
     {
-    Mc = exp(params[0])*TSUN;
-    Mtot = exp(params[1])*TSUN;
+    Mc = exp(params[0])*Tsun;
+    Mtot = exp(params[1])*Tsun;
     distance = exp(params[6])*1.0e9*PC_SI; // distance
     eta = pow((Mc/Mtot), (5.0/3.0));
      if(eta > 0.25)
@@ -4020,8 +3912,8 @@ void Intrinsic(int ll, double *params, double Tobs, int NF, double *FF, double *
     m2 = Mtot*(1.0-dm)/2.0;
     }
     
-    m1_SI = m1*MSUN_SI/TSUN;
-    m2_SI = m2*MSUN_SI/TSUN;
+    m1_SI = m1*MSUN_SI/Tsun;
+    m2_SI = m2*MSUN_SI/Tsun;
     
     chi1 = params[2];  // Spin1
     chi2 = params[3];  // Spin2
@@ -4158,22 +4050,22 @@ void spacecraft(double t, double *x, double *y, double *z)
 
   sb = sin(beta1);
   cb = cos(beta1);
-  x[1] = AU*ca + AU*ec*(sa*ca*sb - (1. + sa*sa)*cb);
-  y[1] = AU*sa + AU*ec*(sa*ca*cb - (1. + ca*ca)*sb);
-  z[1] = -sq3*AU*ec*(ca*cb + sa*sb);
+  x[1] = au*ca + au*ec*(sa*ca*sb - (1. + sa*sa)*cb);
+  y[1] = au*sa + au*ec*(sa*ca*cb - (1. + ca*ca)*sb);
+  z[1] = -sq3*au*ec*(ca*cb + sa*sb);
 
  
   sb = sin(beta2);
   cb = cos(beta2);
-  x[2] = AU*ca + AU*ec*(sa*ca*sb - (1. + sa*sa)*cb);
-  y[2] = AU*sa + AU*ec*(sa*ca*cb - (1. + ca*ca)*sb);
-  z[2] = -sq3*AU*ec*(ca*cb + sa*sb);
+  x[2] = au*ca + au*ec*(sa*ca*sb - (1. + sa*sa)*cb);
+  y[2] = au*sa + au*ec*(sa*ca*cb - (1. + ca*ca)*sb);
+  z[2] = -sq3*au*ec*(ca*cb + sa*sb);
 
   sb = sin(beta3);
   cb = cos(beta3);
-  x[3] = AU*ca + AU*ec*(sa*ca*sb - (1. + sa*sa)*cb);
-  y[3] = AU*sa + AU*ec*(sa*ca*cb - (1. + ca*ca)*sb);
-  z[3] = -sq3*AU*ec*(ca*cb + sa*sb);
+  x[3] = au*ca + au*ec*(sa*ca*sb - (1. + sa*sa)*cb);
+  y[3] = au*sa + au*ec*(sa*ca*cb - (1. + ca*ca)*sb);
+  z[3] = -sq3*au*ec*(ca*cb + sa*sb);
   
 }
 
@@ -4263,10 +4155,7 @@ void lisaskyloc(double t, double *params, double *thetaL, double *phiL)
 // merger time at guiding center of detector
 double Tmerger(double *params, double t)
 {
-    
-    /*   Indicies   */
-    int i,j, k, n, m, a, M;
-    
+        
     /*   Gravitational Wave basis vectors   */
     double *kv;
     
@@ -4277,14 +4166,14 @@ double Tmerger(double *params, double t)
     double kdotx;
     
     /*   GW Source data   */
-    double Mc, theta, phi, psi, D, iota, A, Aplus, Across, f0, fdot, phio;
-    double costh, sinth, cosph, sinph, cosi, cosps, sinps;
+    double phi;
+    double costh, sinth, cosph, sinph;
     
     /*   Time and distance variables   */
     double xa, ya, za;
     
     /*   Miscellaneous  */
-    double xm, td;
+    double td;
     
     /*   Allocating Arrays   */
     
@@ -4320,7 +4209,6 @@ double Tmerger(double *params, double t)
 double f_at_t(double m1, double m2, double chi1, double chi2, double tc, double dt, double t)
 {
     // 3PN f(t)
-    int i;
     double f, fr, fny, af, M, eta, chi, theta;
     double gamma_E=0.5772156649; //Euler's Constant-- shows up in 3PN term
     double PN1, PN15, PN2, PN25, PN3, PN35;
@@ -4387,8 +4275,8 @@ double FofT(int ll, double Tobs, double *params, double *frg, double dt, double 
     
     if(ll == 0)  // linear in m1, m2
     {
-    m1 = params[0]*TSUN;    // Mass1
-    m2 = params[1]*TSUN;    // Mass2
+    m1 = params[0]*Tsun;    // Mass1
+    m2 = params[1]*Tsun;    // Mass2
     distance = params[6]*1.0e9*PC_SI; // distance
     Mtot = (m1+m2);
     eta = m1*m2/((m1+m2)*(m1+m2));
@@ -4396,8 +4284,8 @@ double FofT(int ll, double Tobs, double *params, double *frg, double dt, double 
     }
     else if(ll == 1)  // log in m1, m2
     {
-     m1 = exp(params[0])*TSUN;    // Mass1
-     m2 = exp(params[1])*TSUN;    // Mass2
+     m1 = exp(params[0])*Tsun;    // Mass1
+     m2 = exp(params[1])*Tsun;    // Mass2
      distance = exp(params[6])*1.0e9*PC_SI; // distance
      Mtot = (m1+m2);
      eta = m1*m2/((m1+m2)*(m1+m2));
@@ -4406,8 +4294,8 @@ double FofT(int ll, double Tobs, double *params, double *frg, double dt, double 
     else // log in Mc, Mt
     {
     distance = exp(params[6])*1.0e9*PC_SI; // distance
-    Mc = exp(params[0])*TSUN;
-    Mtot = exp(params[1])*TSUN;
+    Mc = exp(params[0])*Tsun;
+    Mtot = exp(params[1])*Tsun;
     eta = pow((Mc/Mtot), (5.0/3.0));
      if(eta > 0.25)
      {
@@ -4421,8 +4309,8 @@ double FofT(int ll, double Tobs, double *params, double *frg, double dt, double 
     m2 = Mtot*(1.0-dm)/2.0;
     }
     
-    m1_SI = m1*MSUN_SI/TSUN;
-    m2_SI = m2*MSUN_SI/TSUN;
+    m1_SI = m1*MSUN_SI/Tsun;
+    m2_SI = m2*MSUN_SI/Tsun;
     
     chi1 = params[2];
     chi2 = params[3];
@@ -4577,7 +4465,7 @@ void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, doubl
 {
     
     /*   Indicies    */
-    int i,j, k, n, m, a, M;
+    int i,j, k, n;
     
     /*   Gravitational Wave basis vectors   */
     double *u,*v,*kv;
@@ -4589,7 +4477,6 @@ void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, doubl
     double *x, *y, *z;
     double *r12, *r13, *r21, *r23, *r31, *r32;
     double *r10, *r20, *r30;
-    double *vx, *vy, *vz;
     
     double q1, q2, q3, q4;
     
@@ -4600,17 +4487,12 @@ void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, doubl
     double **dplus, **dcross;
     
     /*   GW Source data   */
-    double Mc, theta, phi, psi, D, iota, A, Aplus, Across, f0, fdot, phio;
-    double costh, sinth, cosph, sinph, cosi, cosps, sinps;
+    double phi, psi;
+    double costh, sinth, cosph, sinph, cosps, sinps;
     
     /*   Time and distance variables   */
     double t, xa, ya, za;
-    
-    /*   Miscellaneous  */
-    double xm, fstep, power, om, mx;
-    
-    double delt;
-    
+        
     double fpx, fcx, fpy, fcy, fpz, fcz;
     
     double **TR, **TI, **kdr;

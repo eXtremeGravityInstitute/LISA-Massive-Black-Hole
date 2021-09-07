@@ -281,7 +281,6 @@ double fourier_nwip2(double *a, double *b, double *Sn, int imin, int imax, int N
 {
     int i, j, k;
     double arg, product;
-    double test;
     double ReA, ReB, ImA, ImB;
     
     arg = 0.0;
@@ -303,7 +302,6 @@ double fourier_nwip(double *a, double *b, double *Sn, int n)
 {
     int i, j, k;
     double arg, product;
-    double test;
     double ReA, ReB, ImA, ImB;
     
     arg = 0.0;
@@ -324,8 +322,6 @@ double fourier_nwip(double *a, double *b, double *Sn, int n)
 void fourier_nwip_dual_time(double *abt, double *aA, double *bA, double *aE, double *bE, double *Sn, double Tobs, int n)
 {
     int i, j, k;
-    double arg, product;
-    double test;
     double ReA, ReB, ImA, ImB;
     double scale;
     
@@ -355,8 +351,6 @@ void fourier_nwip_dual_time(double *abt, double *aA, double *bA, double *aE, dou
 void fourier_nwip_time(double *abt, double *a, double *b, double *Sn, double Tobs, int n)
 {
     int i, j, k;
-    double arg, product;
-    double test;
     double ReA, ReB, ImA, ImB;
     double scale;
     
@@ -383,8 +377,7 @@ void fourier_nwip_time(double *abt, double *a, double *b, double *Sn, double Tob
 
 void pbt_shift(double *corr, double *corrf, double *data1, double *data2, double *Sn, int n)
 {
-    int nb2, i, l, k, j;
-    int imax, imin;
+    int nb2, i, l, k;
     
     nb2 = n/2;
     
@@ -413,7 +406,7 @@ void pbt_shift(double *corr, double *corrf, double *data1, double *data2, double
 
 void InChl(int ll, double *params, double **Fisher, double **iChl)
 {
-    int i, j, k, kk;
+    int j, k;
     double **CovI;
     double *scale;
     
@@ -457,7 +450,7 @@ void InChl(int ll, double *params, double **Fisher, double **iChl)
 
 void Ext_In(int ll, double *params, double **Fisher, double **eChl, double **iChl)
 {
-    int i, j, k, kk;
+    int j, k, kk;
     double **FishE;
     double **CovE, **CovI;
     double *scale;
@@ -562,7 +555,6 @@ void de_jump(double *paramsx, double *paramsy, double **history, int m, int d, g
 void FisherEvec(double **fish, double *ej, double **ev, int d)
 {
     int i, j, ecc, sc;
-    double x, maxc;
  
     ecc = 0;
     for (i = 0 ; i < d ; i++) if(fabs(fish[i][i]) < 1.0e-16) ecc = 1;
@@ -642,8 +634,7 @@ void FisherEvec(double **fish, double *ej, double **ev, int d)
 
 void FisherEvecSVD(double **fish, double *ej, double **ev, int d)
 {
-    int i, j, ecc, sc;
-    double x, maxc;
+    int i, j, ecc;
  
     ecc = 0;
     for (i = 0 ; i < d ; i++) if(fabs(fish[i][i]) < 1.0e-16) ecc = 1;
@@ -717,7 +708,6 @@ void FisherEvecSVD(double **fish, double *ej, double **ev, int d)
 void FisherEvecSplit(double **fish, double *ej, double **ev, int d)
 {
     int i, j, ecc, sc;
-    double x, maxc;
     int NIN = 6;
     int NEX = 7;
     double **cov;
@@ -876,7 +866,6 @@ void Inverse(double **M, double **IM, int d)
 {
     int i, j;
     int s;
-    double x, maxc;
     
     gsl_matrix *m = gsl_matrix_alloc (d, d);
     
@@ -920,11 +909,7 @@ void Inverse(double **M, double **IM, int d)
 
 void cholesky(double **A, double **C, int N)
 {
-    int *IPIV;
-    int LWORK = N*N;
-    int INFO;
     int i, j;
-    double dx, dy;
     
 
     
@@ -981,11 +966,8 @@ void cholesky(double **A, double **C, int N)
 
 double det(double **A, int N)
 {
-    int *IPIV;
-    int LWORK = N*N;
-    int INFO;
     int i, j;
-    double dx, dy;
+    double dx;
     int s;
     
     gsl_permutation *p = gsl_permutation_alloc(N);
