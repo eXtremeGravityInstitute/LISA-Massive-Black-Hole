@@ -10,7 +10,7 @@ The code also pads the data out to 16 times the length of one segment and FFTs t
 
 source spec.sh 11
 
-Here the "12" is the number of segments to work through. Each segment takes several minutes to run. Wavelet denoting is used in the initial PSD estimation. A short MCMC is used to improve the spline and line model. This code is taken from QuickCBC and adapted for LISA. The script also makes Qscans of the whitened A, E channel data for each segment.
+Here the "11" is the number of segments to work through (starting at zero, going to eleven). Each segment takes several minutes to run. Wavelet denoting is used in the initial PSD estimation. A short MCMC is used to improve the spline and line model. This code is taken from QuickCBC and adapted for LISA. The script also makes Qscans of the whitened A, E channel data for each segment.
 
 The code SpecAverage.c is used to average and interpolate the PSD estimates from each segment to produce a PSD estimate for the full data set. Compile with
 
