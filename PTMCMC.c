@@ -552,7 +552,7 @@ void MCMC(struct Data *dat, struct Het *het, int ll, int *who, double **paramx)
     {
     FisherHet(dat, het, ll, paramx[i], Fisher[i]);
     FisherEvec(Fisher[i], ejump[i], evec[i], NP);
-    efix(dat, 2, paramx[i], min, max, ejump[i], evec[i], 1.0);
+    efix(dat, het, 1, ll, paramx[i], min, max, ejump[i], evec[i], 1.0);
     }
 
     av = int_matrix(5,NC);
@@ -617,7 +617,7 @@ void MCMC(struct Data *dat, struct Het *het, int ll, int *who, double **paramx)
             {
                 FisherHet(dat, het, ll, paramx[k], Fisher[k]);
                 FisherEvec(Fisher[k], ejump[k], evec[k], NP);
-                efix(dat, 2, paramx[k], min, max, ejump[k], evec[k], 1.0);
+                efix(dat, het, 1, ll, paramx[k], min, max, ejump[k], evec[k], 1.0);
             }
         }
         
