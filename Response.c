@@ -78,7 +78,7 @@ void het_space(struct Data *dat, struct Het *het, int ll, double *params, double
     
     FisherFast(dat, 2, params, fisher);
     FisherEvec(fisher, eval, evec, NP);
-    efix(dat, 2, params, min, max, eval, evec, 50.0);
+    efix(dat, het, 0, 2, params, min, max, eval, evec, 50.0);
     
 
     for (i = 0; i < NP; ++i)
@@ -3109,7 +3109,80 @@ void FisherDirect(struct Data *dat, int ll, double *params, double **Fisher)
     
 }
 
+double chisq_het(struct Data *dat, struct Het *het, int ll, double *params, double **ampR, double **phaseR)
+{
+    double **amp, **phase;
+    double *uu, *vv, **cc;
+    int Nch, M, J, NR;
+    double csq;
+    int i, id, ii, jj, kk;
+    
+    Nch = het->Nch;
+    M = het->M;
+    J = het->J;
+    NR = het->NR;
+    cc = double_matrix(Nch,M);
+    uu = double_vector(J+1);
+    vv = double_vector(J+1);
+    amp = double_matrix(Nch,M);
+    phase = double_matrix(Nch,M);
+    
+    //  phase and amplitude
+    fullphaseamp(dat, ll, M, params, het->freq, amp[0], amp[1], phase[0], phase[1]);
+    
+    
+    csq = 0.0;
+    
+           for (id = 0 ; id < Nch ; id++)  // loop over detectors
+           {
+           
+           // these are the slow terms in the chi-squared sum
+           for(jj = 0; jj < M; jj++)
+           {
+            cc[id][jj] = 0.0;
+            if(het->amp[id][jj] > 0.0)
+             {
+              cc[id][jj] = 4.0*(ampR[id][jj]*ampR[id][jj]+amp[id][jj]*amp[id][jj]-2.0*amp[id][jj]*ampR[id][jj]*cos(phaseR[id][jj]-phase[id][jj]));
+              cc[id][jj] /= (het->amp[id][jj]*het->amp[id][jj]);
+             }
+           }
+    
+       for(ii = 0; ii < NR; ii++)
+        {
+                                                
+           for(jj = 0; jj <= J; jj++)
+           {
+             vv[jj] = cc[id][ii*J+jj];
+             uu[jj] = 0.0;
+           }
+                                                
+           // get Legendre coefficients for slow term
+          for(jj = 0; jj <= J; jj++)
+           {
+           for(kk = 0; kk <= J; kk++)
+            {
+             uu[jj] += het->IP[ii][jj][kk]*vv[kk];
+            }
+           }
+                                                
+           for(jj = 0; jj <= J; jj++) csq += uu[jj]*het->SL[ii][id][jj];
+                                                
+           if(ii < NR-2) csq -= het->aa[id][ii+1]*vv[J];  // correction for overcount
+                                 
+        }
+               
+        }
 
+    
+     free_double_matrix(cc,Nch);
+     free_double_vector(uu);
+     free_double_vector(vv);
+     free_double_matrix(amp,Nch);
+     free_double_matrix(phase,Nch);
+    
+    return(csq);
+    
+}
 
 double chisq(struct Data *dat, int ll, double *params, double *AR, double *ER)
 {
@@ -3139,7 +3212,7 @@ double chisq(struct Data *dat, int ll, double *params, double *AR, double *ER)
     
 }
 
-void efix(struct Data *dat, int ll, double *params, double *min, double *max, double *eval, double **evec, double zs)
+void efix(struct Data *dat, struct Het *het, int hr, int ll, double *params, double *min, double *max, double *eval, double **evec, double zs)
 {
     int i, j, k, flag;
     double alpha0, x, z, z0, alpha, alphanew;
@@ -3148,12 +3221,21 @@ void efix(struct Data *dat, int ll, double *params, double *min, double *max, do
     double zmx, zmn;
     double dzmin, alpham, zm;
     double *px;
+    double **ampR, **phaseR;
     double *AR, *ER;
     
+    if(hr == 1)  // using heterodyne
+    {
+    ampR = double_matrix(het->Nch,het->M);
+    phaseR = double_matrix(het->Nch,het->M);
+    fullphaseamp(dat, ll, het->M, params, het->freq, ampR[0], ampR[1], phaseR[0], phaseR[1]);
+    }
+    else
+    {
     AR = (double*)malloc(sizeof(double)* (dat->N));
     ER = (double*)malloc(sizeof(double)* (dat->N));
-    
     ResponseFast(dat, ll, params, AR, ER);
+    }
     
     // [0] ln(Mass1)  [1] ln(Mass2)  [2] Spin1 [3] Spin2 [4] phic [5] tc [6] ln(distance)
      // [7] EclipticCoLatitude, [8] EclipticLongitude  [9] polarization, [10] inclination
@@ -3220,7 +3302,14 @@ void efix(struct Data *dat, int ll, double *params, double *min, double *max, do
           if(eta < etamin) px[0] = px[1] + 3.0/5.0*log(etamin);
           }
           
+          if(hr == 1)  // using heterodyne
+          {
+          z0 = chisq_het(dat, het, ll, px, ampR, phaseR);
+          }
+          else
+          {
           z0 = chisq(dat, ll, px, AR, ER);
+          }
           
          //printf("B %f %f\n", alpha0, z0);
           
@@ -3286,7 +3375,16 @@ void efix(struct Data *dat, int ll, double *params, double *min, double *max, do
             if(eta < etamin) px[0] = px[1] + 3.0/5.0*log(etamin);
             }
             
-            z = chisq(dat, ll, px, AR, ER);
+           
+            
+            if(hr == 1)  // using heterodyne
+            {
+            x = chisq_het(dat, het, ll, px, ampR, phaseR);
+            }
+            else
+            {
+              z = chisq(dat, ll, px, AR, ER);
+            }
             
             //printf("R %f %f\n", alpha, z);
             
@@ -3313,7 +3411,7 @@ void efix(struct Data *dat, int ll, double *params, double *min, double *max, do
  
              k++;
              
-        } while (fabs(z-zs) > 0.2 && k < 10 && fabs(alpha < 1.0e4));
+        } while (fabs(z-zs) > 0.2 && k < 10 && fabs(alpha) < 1.0e4);
          
           // printf("F %f %f\n", alpham, zm);
          
@@ -3328,8 +3426,17 @@ void efix(struct Data *dat, int ll, double *params, double *min, double *max, do
      }
     
     free_double_vector(px);
-    free(AR);
-    free(ER);
+    
+    if(hr == 1)  // using heterodyne
+    {
+    free_double_matrix(ampR,het->Nch);
+    free_double_matrix(phaseR,het->Nch);
+    }
+    else
+    {
+     free(AR);
+     free(ER);
+    }
     
 }
 

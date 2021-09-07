@@ -54,6 +54,7 @@ double Likelihood_check(struct Data *dat, struct Het *het, int ll, double *param
 double Likelihood_Slow(struct Data *dat, int ll, double *params);
 void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *ES);
 double chisq(struct Data *dat, int ll, double *params, double *AR, double *ER);
+double chisq_het(struct Data *dat, struct Het *het, int ll, double *params, double **ampR, double **phaseR);
 void heterodyne(struct Data *dat, struct Het *het, int ll, double *params);
 void legendre_maker(int J, int U, double **P);
 void fullphaseamp(struct Data *dat, int ll, int K, double *params, double *freq, double *Aamp, *Eamp, *Aphase, *Ephase);
@@ -94,7 +95,7 @@ void timearray(double *params, RealVector *freq, long N, double *TF, AmpPhaseFDW
 double fourier_nwip(double *a, double *b, double *Sn, int n);
 double FofT(int ll, double Tobs, double *params, double *frg, double dt, double tref);
 void Extrinsic(double *params, double Tstart, double Tend, int NF, double *FF, double *TF, double *PF, double *AF, double *AAmp, double *EAmp, double *APhase, double *EPhase, double *kxm);
-void efix(struct Data *dat, int ll, double *params, double *min, double *max, double *eval, double **evec, double zs);
+void efix(struct Data *dat, struct Het *het, int hr, int ll, double *params, double *min, double *max, double *eval, double **evec, double zs);
 void het_space(struct Data *dat, struct Het *het, int ll, double *params, double *min, double *max);
 
 void getfreq(double Tend, double *fnew, double *tf, double *Amp, double *Phase, double t, double fguess, double phic, double fRef_in, double m1_SI, double m2_SI, double chi1, double chi2, double distance, double tc);
