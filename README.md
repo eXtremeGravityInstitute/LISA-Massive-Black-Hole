@@ -8,7 +8,7 @@ gcc -o segmentSangria segmentSangria.c -lhdf5 -lgsl
 
 The code also pads the data out to 16 times the length of one segment and FFTs the windowed and padded data. This can be used when running on the full data set. [TODO - change from radix 2 FFTs to general FFTs so less padding needed.] The segment code does not talk very long to run. Next up we need PSD estimates. This is done by invoking the script
 
-source spec.sh 12
+source spec.sh 11
 
 Here the "12" is the number of segments to work through. Each segment takes several minutes to run. Wavelet denoting is used in the initial PSD estimation. A short MCMC is used to improve the spline and line model. This code is taken from QuickCBC and adapted for LISA. The script also makes Qscans of the whitened A, E channel data for each segment.
 
