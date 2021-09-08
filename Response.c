@@ -1375,9 +1375,6 @@ void FstatFull(struct MBH_Data *dat, int ll, double *params, double *pnew)
      free_double_matrix(filtA,4);
      free_double_matrix(filtE,4);
     
-    
-    
-    return;
 }
 
 
@@ -1733,7 +1730,6 @@ void Extrinsic(double *params, double Tstart, double Tend, int NF, double *FF, d
     free(FcEI);
     free(FpEI);
     
-    return;
 }
 
 
@@ -4694,5 +4690,423 @@ void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, doubl
     
     return;
 }
+
+void update(struct MBH_Data *dat, struct Het *het, int typ, int k, int ll, double *logLx, double **paramx, double **paramy, double **sx, double **sy, double *min, double *max, int *who, double *heat, double ***history, int NH, double **ejump, double ***evec, int **cv, int **av, gsl_rng *r)
+{
+    int q, i, j;
+    int fstat;
+    double qx, qy, tx, nhy;
+    double alpha, beta, pDx, pDy, H;
+    double logLy, eta, leta, pMcMx, pMcMy, lglx;
+    double lm1, lm2, chi1, chi2;
+    int flag;
+    double cth, phi;
+    double x, y;
+    double Lf;
+    double *jump, *zv;
+    double *u;
+    
+    // set to 1 to use Fstat likelihood
+    fstat = 0;
+    
+    u = double_vector(5);
+    
+    jump = double_vector(NI);
+    zv = double_vector(NI);
+    
+    q = who[k];
+    
+    qx = qy = 0.0;    // log proposal densities
+    
+    if(typ == 0) // fisher jump
+    {
+        
+        // pick an eigendirection to jump in
+        beta = gsl_rng_uniform(r);
+        i = (int)(beta*(NP));
+        // draw the jump size
+        beta = sqrt(heat[k])*ejump[q][i]*gsl_ran_gaussian(r,1.0);
+        for(j = 0; j < NP; j++) paramy[q][j] = paramx[q][j]+beta*evec[q][i][j];
+        
+        tx = -1.0;
+    }
+    else if(typ == 1)// differential evolution
+    {
+        
+        // the history file is kept for each temperature
+        
+        de_jump(paramx[q], paramy[q], history[k], NH, NP, r);
+        
+        tx = Tmerger(paramx[q],paramx[q][5]);
+        
+    }
+    else if(typ == 2)// big sky
+    {
+             beta = gsl_rng_uniform(r);
+             if(beta > 0.7)
+             {
+                 cth = -1.0+2.0*gsl_rng_uniform(r);
+                 phi = TPI*gsl_rng_uniform(r);
+             }
+             else if (beta > 0.3)
+             {
+                 cth = paramx[q][7] + gsl_ran_gaussian(r,0.1);
+                 phi = paramx[q][8] + gsl_ran_gaussian(r,0.1);
+             }
+             else
+             {
+                 cth = paramx[q][7] + gsl_ran_gaussian(r,0.05);
+                 phi = paramx[q][8] + gsl_ran_gaussian(r,0.05);
+             }
+             
+             if(phi < 0.0) phi += TPI;
+             if(phi > TPI) phi -= TPI;
+        
+                paramy[q][7] = cth;
+                paramy[q][8] = phi;
+
+        if(fabs(cth) < 1.0)
+          {
+        
+        int *pmap;
+        double **Fish;
+        double *params;
+        double **Svec;
+        double *Sval;
+              
+        Svec = double_matrix(4,4);
+        Sval = double_vector(4);
+        
+        pmap = (int*)malloc(sizeof(int)* (NP));
+        Fish = double_matrix(4,4);
+        params = (double*)malloc(sizeof(double)* (NP));
+        
+        pmap[0] = pmap[1] = pmap[2] = pmap[3] = -1;
+        pmap[5] = pmap[7] = pmap[8] = -1;
+        pmap[4] = 0;
+        pmap[6] = 1;
+        pmap[9] = 2;
+        pmap[10] = 3;
+        
+        
+        for(j = 0; j < NP; j++) params[j] = paramx[q][j];
+        tx = -1.0;  // time offset will be at correct value, no need to maximize
+             
+        lglx = Fstat_het(dat, het, ll, params, sx[q], tx);
+        
+        // The signal is invariant under these shifts. Find out which one gives
+        // the smallest parameter deltas
+        j = 0;
+        u[0] = fabs(params[4]-paramx[q][4]) + fabs(params[9]-paramx[q][9]);
+        u[1] = fabs(params[4]+PI/2-paramx[q][4]) + fabs(params[9]+PI/2-paramx[q][9]);
+        u[2] = fabs(params[4]+PI/2-paramx[q][4]) + fabs(params[9]-PI/2-paramx[q][9]);
+        u[3] = fabs(params[4]-PI/2-paramx[q][4]) + fabs(params[9]+PI/2-paramx[q][9]);
+        u[4] = fabs(params[4]-PI/2-paramx[q][4]) + fabs(params[9]-PI/2-paramx[q][9]);
+        
+        j = 0;
+        y = u[0];
+        for (i=1; i< 5; i++)
+        {
+           if(u[i] < y)
+            {
+                y = u[i];
+                j = i;
+            }
+        }
+        
+        if(j == 1)
+        {
+            params[4] += PI/2;
+            params[9] += PI/2;
+        }
+        
+        if(j == 2)
+        {
+            params[4] += PI/2;
+            params[9] -= PI/2;
+        }
+        
+        if(j == 3)
+        {
+            params[4] -= PI/2;
+            params[9] += PI/2;
+        }
+        
+        if(j == 4)
+        {
+            params[4] -= PI/2;
+            params[9] -= PI/2;
+        }
+        
+        //FisherSub(dat, ll, pmap, params, Fish);
+        FisherSubHet(dat, het, ll, pmap, params, Fish);
+        
+        qx = 0.0;
+        for (i=0; i< NP; i++)
+        {
+            if(pmap[i] > -1)
+            {
+              for (j=0; j< NP; j++)
+               {
+                if(pmap[j] > -1) qx -= 0.5*Fish[pmap[i]][pmap[j]]*(paramx[q][i]-params[i])*(paramx[q][j]-params[j]);
+               }
+            }
+        }
+        
+         //y = logLx[q]-lglx;
+        //printf("%f %f\n", y, qx);
+        
+        x = det(Fish,4)/(heat[k]*heat[k]*heat[k]*heat[k]);
+        
+        qx /= heat[k];
+        
+       // printf("%f %f\n", qx, 0.5*log(x));
+        
+        qx += 0.5*log(x);
+        
+        
+        for(j = 0; j < NP; j++) params[j] = paramx[q][j];
+        params[7] = cth;
+        params[8] = phi;
+        
+        tx = Tmerger(paramx[q],paramx[q][5]);
+             
+        Lf = Fstat_het(dat, het, ll, params, sx[q], tx);
+        
+        //FisherSub(dat, ll, pmap, params, Fish);
+        FisherSubHet(dat, het, ll, pmap, params, Fish);
+        
+        FisherEvec(Fish, Sval, Svec, 4);
+        
+        for(j = 0; j < NP; j++) paramy[q][j] = params[j];
+        
+        // pick an eigendirection to jump in
+        beta = gsl_rng_uniform(r);
+        i = (int)(beta*4);
+        // draw the jump size
+        beta = sqrt(heat[k])*Sval[i]*gsl_ran_gaussian(r,1.0);
+        for(j = 0; j < NP; j++)
+        {
+          if(pmap[j] > -1) paramy[q][j] = params[j]+beta*Svec[i][pmap[j]];
+        }
+        
+        qy = 0.0;
+        for (i=0; i< NP; i++)
+        {
+            if(pmap[i] > -1)
+            {
+                for (j=0; j< NP; j++)
+                {
+                    if(pmap[j] > -1) qy -= 0.5*Fish[pmap[i]][pmap[j]]*(paramy[q][i]-params[i])*(paramy[q][j]-params[j]);
+                }
+            }
+        }
+        
+        //printf("%f %f\n", v-w, qy);
+        
+        x = det(Fish,4)/(heat[k]*heat[k]*heat[k]*heat[k]);
+        
+        qy /= heat[k];
+        
+        // printf("%f %f\n", qy, 0.5*log(x));
+        
+        qy += 0.5*log(x);
+        
+       // printf("%f %f\n", qx, qy);
+        
+       // printf("%f %f %f %f %f ", qx, qy, lglx, logLx[q], Lf);
+        
+        
+        // Need to include a Jacobian that accounts for the deteministic time mapping.
+        // The Tmerger function is used to re-set tc so that the merger occurs at the
+        // same time in the detector. Depending on the sky location, the time range dt
+        // mapped to by a unit dcostheta dphi around the reference location will be different.
+        
+        // Test were unclear on wether this kind of term was needed
+        
+        // tvol is the time volume surrounding theta, phi
+        //qy += log(tvol(paramy[q]));
+        //qx += log(tvol(paramx[q]));
+        
+        
+        // To cover the full range, apply a pi shift to 2psi and 2phic
+        beta = gsl_rng_uniform(r);
+        if(beta > 0.5)
+        {
+            paramy[q][4] += PI/2.0;
+            paramy[q][9] += PI/2.0;
+        }
+              
+        
+        free_double_matrix(Fish,4);
+        free(pmap);
+        free(params);
+        free_double_matrix(Svec,4);
+        free_double_vector(Sval);
+              
+          }
+        
+         
+         // Note that testing this proposal using logL=const requires is not very informative since the
+         // Ftstat likelihood mostly gets skipped since the intrinsic parameters are not close to the true.
+        
+    }
+    else  // update PSD scaling
+    {
+        beta = gsl_rng_uniform(r);
+        if(beta > 0.7)
+        {
+            x = 0.1;
+        }
+        else if (beta > 0.3)
+        {
+            x = 0.01;
+        }
+        else
+        {
+            x = 0.001;
+        }
+        
+        for(i = 0; i < dat->Nch; i++) sy[q][i] = sx[q][i] + gsl_ran_gaussian(r,x);
+                                                  
+    }
+    
+    
+    // [0] ln Mass1  [1] ln Mass2  [2] Spin1 [3] Spin2 [4] phic [5] tc [6] ln distance
+    // [7] EclipticCoLatitude, [8] EclipticLongitude  [9] polarization, [10] inclination
+
+    if(ll == 0 || ll == 1)
+    {
+    if(paramy[q][1] > paramy[q][0])  // catch if m2 > m1 and flip
+    {
+        lm1 = paramy[q][1];
+        chi1 = paramy[q][3];
+        lm2 = paramy[q][0];
+        chi2 = paramy[q][2];
+        paramy[q][0] = lm1;
+        paramy[q][1] = lm2;
+        paramy[q][2] = chi1;
+        paramy[q][3] = chi2;
+    }
+    }
+    
+    
+    
+    cv[typ][k]++;
+    
+    // [0] ln Mass1  [1] ln Mass2  [2] Spin1 [3] Spin2 [4] phic [5] tc [6] ln distance
+    // [7] EclipticCoLatitude, [8] EclipticLongitude  [9] polarization, [10] inclination
+    
+
+    // re-map angular parameters to their proper range
+    if(paramy[q][4] > PI)   paramy[q][4] -= PI;
+    if(paramy[q][4] < 0.0)  paramy[q][4] += PI;
+    if(paramy[q][8] > TPI)  paramy[q][8] -= TPI;
+    if(paramy[q][8] < 0.0)  paramy[q][8] += TPI;
+    if(paramy[q][9] > PI)   paramy[q][9] -= PI;
+    if(paramy[q][9] < 0.0)  paramy[q][9] += PI;
+
+    
+    // check proposed values are in prior range
+    flag = 0;
+    for(i = 0; i < NP; i++)
+    {
+        if(paramy[q][i] > max[i] || paramy[q][i] < min[i]) flag = 1;
+    }
+    
+    if(nflag == 1)
+    {
+        for(i = 0; i < dat->Nch; i++) if(sy[q][i] < 0.25) flag = 1;
+        for(i = 0; i < dat->Nch; i++) if(sy[q][i] > 4.0) flag = 1;
+    }
+     
+    
+    if(ll == 2 && flag == 0)
+    {
+     // eta cannot exceed 0.25
+     leta = (5.0/3.0)*(paramy[q][0]-paramy[q][1]);
+     if(leta > log(0.25)) flag = 1;
+    
+      // Jacobian that makes the prior flat in m1, m2.
+      if(flag == 0)
+      {
+        eta = exp(leta);
+        pMcMy = 2.0*paramy[q][1]+leta-0.5*log(1.0-4.0*eta);
+        
+        leta = (5.0/3.0)*(paramx[q][0]-paramx[q][1]);
+        eta = exp(leta);
+        pMcMx = 2.0*paramx[q][1]+leta-0.5*log(1.0-4.0*eta);
+      }
+        
+    }
+    
+    if(flag == 0)
+    {
+        // Jacobian that makes the prior flat in m1, m2.
+        // Jacobian is m1*m2, but we combine the probablities as logs
+        if(ll == 0)
+        {
+        pMcMy = log(paramy[q][0]*paramy[q][1]);
+        pMcMx = log(paramx[q][0]*paramx[q][1]);
+        }
+
+        if(ll == 1)
+        {
+        pMcMy = paramy[q][0]+paramy[q][1];
+        pMcMx = paramx[q][0]+paramx[q][1];
+        }
+        
+        logLy = 0.0;
+        nhy = 0.0;
+        
+        if(lhold == 0)
+        {
+            //logLy = Likelihood(dat, ll, paramy[q]);
+            logLy = log_likelihood_het(dat, het, ll, paramy[q], sy[q]);
+        }
+        
+    
+    // variable in MCMC is x=logD, so p(x) = dD/dx p(D) = D p(D) = D^3
+    
+    //pDx = 3.0*paramx[q][6];   // uniform in volume prior
+    //pDy = 3.0*paramy[q][6];   // uniform in volume prior
+    
+        if(ll == 0)
+        {
+        pDx = log(paramx[q][6]);   // uniform in distance prior
+        pDy = log(paramy[q][6]);   // uniform in distance prior
+        }
+        else
+        {
+        pDx = paramx[q][6];   // uniform in distance prior
+        pDy = paramy[q][6];   // uniform in distance prior
+        }
+    
+    
+    H = (logLy-logLx[q])/heat[k] + pMcMy + pDy - qy - pDx - pMcMx + qx;
+        
+   // if(typ == 2) printf("%e %e\n", qx, qy);
+    
+    
+    alpha = log(gsl_rng_uniform(r));
+
+    
+    if(H > alpha)
+    {
+        // copy over new state if accepted
+        logLx[q] = logLy;
+        for(i = 0; i < NP; i++) paramx[q][i] = paramy[q][i];
+        if(nflag == 1) for(i = 0; i < dat->Nch; i++) sx[q][i] = sy[q][i];
+        av[typ][k]++;
+    }
+        
+    }
+    
+    free_double_vector(u);
+    free_double_vector(jump);
+    free_double_vector(zv);
+    
+}
+
 
 

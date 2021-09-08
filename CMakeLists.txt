@@ -15,7 +15,7 @@ find_package(OpenMP REQUIRED)
 set(CMAKE_C_COMPILER mpicc)
 
 # set cflags
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffast-math -Wall -O3 -ftree-vectorize -std=gnu99")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffast-math -Wall -Wextra -O3 -ftree-vectorize -std=gnu99")
 
 # Internal products
 

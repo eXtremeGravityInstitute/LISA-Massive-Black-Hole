@@ -98,7 +98,6 @@ void efix(struct MBH_Data *dat, int ll, double *params, double *min, double *max
 void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, double *min, double *max);
 
 void getfreq(double Tend, double *fnew, double *tf, double *Amp, double *Phase, double t, double fguess, double phic, double fRef_in, double m1_SI, double m2_SI, double chi1, double chi2, double distance, double tc);
-void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **params);
 void update(struct MBH_Data *dat, struct Het *het, int typ, int k, int ll, double *logLx, double **paramx, double **paramy, double **sx, double **sy, double *min, double *max, int *who, double *heat, double ***history, int NH, double **ejump, double ***evec, int **cv, int **av, gsl_rng *r);
 double Likelihood(struct MBH_Data *dat, int ll, double *params);
 double LikelihoodDeltaMaxT(struct MBH_Data *dat, int ll, double *params, int NF, double *FF, double *AA, double *EA, double *AP, double *EP);
