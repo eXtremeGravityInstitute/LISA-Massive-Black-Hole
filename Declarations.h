@@ -49,9 +49,7 @@ void SetUp(struct MBH_Data *dat, int ll, double *params, int NFmax, int *NFS, do
 void StartStop(int ll, double *params, double Tstart, double Tend, double dt, double *fstart, double *fstop, double *frg);
 void Intrinsic(int ll, double *params, double Tobs, int NF, double *FF, double *TF, double *PF, double *AF);
 void ResponseFast(struct MBH_Data *dat, int ll, double *params, double *AS, double *ES);
-double Likelihood(struct MBH_Data *dat, int ll, double *params);
 double Likelihood_check(struct MBH_Data *dat, struct Het *het, int ll, double *params);
-double Likelihood_Slow(struct MBH_Data *dat, int ll, double *params);
 void ResponseFreq(struct MBH_Data *dat, int ll, double *params, double *AS, double *ES);
 double chisq(struct MBH_Data *dat, int ll, double *params, double *AR, double *ER);
 double chisq_het(struct MBH_Data *dat, struct Het *het, int ll, double *params, double **ampR, double **phaseR);
@@ -92,7 +90,6 @@ void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, doubl
 void RAfilters(double *params, int NF, double *TF, double *FF, double *xi, double *FpAR, double *FpAI, double *FcAR, double *FcAI,
                double *FpER, double *FpEI, double *FcER, double *FcEI);
 void timearray(double *params, RealVector *freq, long N, double *TF, AmpPhaseFDWaveform *ap);
-double fourier_nwip(double *a, double *b, double *Sn, int n);
 double FofT(int ll, double Tobs, double *params, double *frg, double dt, double tref);
 void Extrinsic(double *params, double Tstart, double Tend, int NF, double *FF, double *TF, double *PF, double *AF, double *AAmp, double *EAmp, double *APhase, double *EPhase, double *kxm);
 void efix(struct MBH_Data *dat, struct Het *het, int hr, int ll, double *params, double *min, double *max, double *eval, double **evec, double zs);
@@ -100,7 +97,6 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
 void instrument_noise(double f, double *SAE);
 void getfreq(double Tend, double *fnew, double *tf, double *Amp, double *Phase, double t, double fguess, double phic, double fRef_in, double m1_SI, double m2_SI, double chi1, double chi2, double distance, double tc);
 void update(struct MBH_Data *dat, struct Het *het, int typ, int k, int ll, double *logLx, double **paramx, double **paramy, double **sx, double **sy, double *min, double *max, int *who, double *heat, double ***history, int NH, double **ejump, double ***evec, int **cv, int **av, gsl_rng *r);
-double Likelihood(struct MBH_Data *dat, int ll, double *params);
 double LikelihoodDeltaMaxT(struct MBH_Data *dat, int ll, double *params, int NF, double *FF, double *AA, double *EA, double *AP, double *EP);
 double LikelihoodDeltaMax(struct MBH_Data *dat, int ll, double *params, int NF, double *FF, double *AA, double *EA, double *AP, double *EP);
 double LikelihoodDelta(struct MBH_Data *dat, int ll, double *params, int NF, double *FF, double *AA, double *EA, double *AP, double *EP);
@@ -112,9 +108,7 @@ double fourier_nwip2(double *a, double *b, double *Sn, int imin, int imax, int N
 void fourier_nwip_time(double *abt, double *a, double *b, double *Sn, double Tobs, int n);
 void fourier_nwip_dual_time(double *abt, double *aA, double *bA, double *aE, double *bE, double *Sn, double Tobs, int n);
 void FstatRA(struct MBH_Data *dat, int ll, double *params, double *pnew, int NF, double *FF, double *TF, double *PF, double *AF, double *AAmp, double *EAmp, double *APhase, double *EPhase);
-void FisherDirect(struct MBH_Data *dat, int ll, double *params, double **Fisher);
 void FisherDirectShift(struct MBH_Data *dat, int ll, double *params, double **Fisher);
-void FstatFull(struct MBH_Data *dat, int ll, double *params, double *pnew);
 void FisherSub(struct MBH_Data *dat, int ll, int *pmap, double *params, double **Fisher);
 void FisherFast(struct MBH_Data *dat, int ll, double *params, double **Fisher);
 double f_start(double m1, double m2, double chi1, double chi2, double tc);
