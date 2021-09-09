@@ -285,13 +285,11 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
     double m1, m2, DL;
     int i, j, k, n, q, mc, NF, N;
     int NFmax = 100000;
-    double *AF, *PF, *FF, *TF, *FS;
     int NH=1000;
     int MP;
     int M = 2000000;
     double *heat;
     double **paramy;
-    double *pref;
     double ***Fisher;
     double ***history;
     double *min, *max;
@@ -331,42 +329,7 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
     N = dat->N;
     
     pmax = (double*)malloc(sizeof(double)* (NP));
-    pref = (double*)malloc(sizeof(double)* (NP));
     
-    for (i=0; i< NP; i++) pref[i] = paramx[who[0]][i];
-
-    FS = (double*)malloc(sizeof(double)* (NFmax));
-
-    SetUp(dat, ll, pref, NFmax, &NF, FS);
-    
-    AF = (double*)malloc(sizeof(double)* (NF));
-    PF = (double*)malloc(sizeof(double)* (NF));
-    TF = (double*)malloc(sizeof(double)* (NF));
-    
-    Intrinsic(ll, pref, dat->Tstart, NF, FS, TF, PF, AF);
-    
-    AAmp = (double*)malloc(sizeof(double)* (NF));
-    EAmp = (double*)malloc(sizeof(double)* (NF));
-    APhase = (double*)malloc(sizeof(double)* (NF));
-    EPhase = (double*)malloc(sizeof(double)* (NF));
-
-
-    Extrinsic(pref, dat->Tstart, dat->Tend, NF, FS, TF, PF, AF, AAmp, EAmp, APhase, EPhase, &kxm);
-    
-    FF = (double*)malloc(sizeof(double)* (NF+1));
-    for(n=0; n< NF; n++) FF[n] = FS[n];
-    
-    free(FS);
-    free(TF);
-    free(PF);
-    free(AF);
-    free(AAmp);
-    free(EAmp);
-    free(APhase);
-    free(EPhase);
-    
-    /* =============================================================================================== */
-
     sacc = int_vector(NC);
     scount = int_vector(NC);
     heat = double_vector(NC);
@@ -408,7 +371,7 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
     min[1] = log(1.0e3);
     }
     
-    
+    /* ll == 2 is the default */
     if(ll == 2)
     {
     max[0] = log(0.44*5.0e8);
@@ -444,12 +407,13 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
     het_space(dat, het, ll, paramx[who[0]], min, max);
     heterodyne(dat, het, ll, paramx[who[0]]);
     
+    //initialize noise model
     for (i=0; i< NC; i++)
        {
          for (j=0; j< dat->Nch; j++) sx[i][j] = 1.0;
        }
    
-
+    //initialize parameter chain buffer
     for (i=0; i< NC; i++)
     {
         for (k=0; k< NH; k++)
@@ -457,35 +421,14 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
             for (j=0; j< NP; j++) history[i][k][j] = paramx[i][j];
         }
     }
-
-
-    /*
-     start = clock();
-     for(i=0; i<100; i++) x = log_likelihood_het(dat, het, ll, paramx[0], sx[0]);
-     end = clock();
-     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-     printf("heterodyned likelihood calculation took %f seconds\n", cpu_time_used/100.0);
     
-      start = clock();
-      for(i=0; i<100; i++) x = Likelihood(dat, ll, paramx[0]);
-      end = clock();
-      cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-      printf("fast likelihood calculation took %f seconds\n", cpu_time_used/100.0);
-    
-      start = clock();
-      for(i=0; i<100; i++) x = Likelihood_Slow(dat, ll, paramx[0]);
-      end = clock();
-      cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-      printf("full likelihood calculation took %f seconds\n", cpu_time_used/100.0);
-    */
-    
-    
-
+    //initialize likelihood for each chain
     for (i=0; i< NC; i++)
     {
     logLx[i] = log_likelihood_het(dat, het, ll, paramx[i], sx[i]);
     }
     
+    //store max likelihood & parameters
     logLmax = logLx[who[0]];
     for (j=0; j< NP; j++) pmax[j] = paramx[who[0]][j];
      
@@ -854,8 +797,6 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
     free_double_tensor(Fisher,NC,NP);
     free_double_matrix(ejump,NC);
     free_double_tensor(evec,NC,NP);
-
-    free(FF);
     
     //###############################################
     //MT modification
