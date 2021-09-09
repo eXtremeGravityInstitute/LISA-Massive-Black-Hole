@@ -48,24 +48,14 @@ double SNRFast(struct MBH_Data *dat, int ll, double *params);
 void SetUp(struct MBH_Data *dat, int ll, double *params, int NFmax, int *NFS, double *FF);
 void StartStop(int ll, double *params, double Tstart, double Tend, double dt, double *fstart, double *fstop, double *frg);
 void Intrinsic(int ll, double *params, double Tobs, int NF, double *FF, double *TF, double *PF, double *AF);
-<<<<<<< HEAD
 void ResponseFast(struct MBH_Data *dat, int ll, double *params, double *AS, double *ES);
 double Likelihood(struct MBH_Data *dat, int ll, double *params);
 double Likelihood_check(struct MBH_Data *dat, struct Het *het, int ll, double *params);
 double Likelihood_Slow(struct MBH_Data *dat, int ll, double *params);
 void ResponseFreq(struct MBH_Data *dat, int ll, double *params, double *AS, double *ES);
 double chisq(struct MBH_Data *dat, int ll, double *params, double *AR, double *ER);
+double chisq_het(struct MBH_Data *dat, struct Het *het, int ll, double *params, double **ampR, double **phaseR);
 void heterodyne(struct MBH_Data *dat, struct Het *het, int ll, double *params);
-=======
-void ResponseFast(struct Data *dat, int ll, double *params, double *AS, double *ES);
-double Likelihood(struct Data *dat, int ll, double *params);
-double Likelihood_check(struct Data *dat, struct Het *het, int ll, double *params);
-double Likelihood_Slow(struct Data *dat, int ll, double *params);
-void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *ES);
-double chisq(struct Data *dat, int ll, double *params, double *AR, double *ER);
-double chisq_het(struct Data *dat, struct Het *het, int ll, double *params, double **ampR, double **phaseR);
-void heterodyne(struct Data *dat, struct Het *het, int ll, double *params);
->>>>>>> main
 void legendre_maker(int J, int U, double **P);
 void fullphaseamp(struct MBH_Data *dat, int ll, int K, double *params, double *freq, double *Aamp, double *Eamp, double *Aphase, double *Ephase);
 double log_likelihood_het(struct MBH_Data *dat, struct Het *het, int ll, double *params, double *sx);
