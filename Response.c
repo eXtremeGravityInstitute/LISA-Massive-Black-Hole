@@ -728,14 +728,11 @@ double log_likelihood_het(struct MBH_Data *dat, struct Het *het, int ll, double 
     double **amp, **phase;
     double **hc, **hs;
     double HH, HR, logL;
-    double x, y;
     double **cc, **ss;
     double *uu, *vv;
     int i, j, k, id, M, J, NR;
     int Nch = het->Nch;
-    
-    FILE *out;
-    
+        
     logL = 0.0;
     
     if(lhold == 0)
@@ -3015,13 +3012,13 @@ void FisherDirect(struct MBH_Data *dat, int ll, double *params, double **Fisher)
     
 }
 
-double chisq_het(struct Data *dat, struct Het *het, int ll, double *params, double **ampR, double **phaseR)
+double chisq_het(struct MBH_Data *dat, struct Het *het, int ll, double *params, double **ampR, double **phaseR)
 {
     double **amp, **phase;
     double *uu, *vv, **cc;
     int Nch, M, J, NR;
     double csq;
-    int i, id, ii, jj, kk;
+    int id, ii, jj, kk;
     
     Nch = het->Nch;
     M = het->M;
@@ -3348,10 +3345,9 @@ void efix(struct MBH_Data *dat, struct Het *het, int hr, int ll, double *params,
 void instrument_noise(double f, double *SAE)
 {
     //Power spectral density of the detector noise and transfer frequency
-    double Sn, red, confusion_noise;
-    double Sloc, fonfs;
-    double f1, f2;
-    double A1, A2, slope, LC;
+    double red;
+    double fonfs;
+    double LC;
     double Sps = 2.25e-22;
     double Sacc = 9.0e-30;
     
