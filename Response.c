@@ -31,7 +31,7 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     
     N = dat->N;
     
-    pflag = 1;  // print diagnostics if pflag = 1
+    pflag = 0;  // print diagnostics if pflag = 1
     
     int Nch = dat->Nch;
     
@@ -577,7 +577,7 @@ void heterodyne(struct MBH_Data *dat, struct Het *het, int ll, double *params)
     
     het->SNR = sqrt(x);
     
-    printf("ref logL = %e\n", logL);
+    //printf("ref logL = %e\n", logL);
     
     for(id = 0; id < Nch; id++)
        {

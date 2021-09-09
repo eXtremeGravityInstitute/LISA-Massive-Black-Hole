@@ -44,7 +44,6 @@ struct Het
 
 void freehet(struct Het *het);
 void lisaskyloc(double t, double *params, double *thetaL, double *phiL);
-double SNRFast(struct MBH_Data *dat, int ll, double *params);
 void SetUp(struct MBH_Data *dat, int ll, double *params, int NFmax, int *NFS, double *FF);
 void StartStop(int ll, double *params, double Tstart, double Tend, double dt, double *fstart, double *fstop, double *frg);
 void Intrinsic(int ll, double *params, double Tobs, int NF, double *FF, double *TF, double *PF, double *AF);

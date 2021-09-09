@@ -296,6 +296,27 @@ double fourier_nwip2(double *a, double *b, double *Sn, int imin, int imax, int N
     
 }
 
+double fourier_nwip(double *a, double *b, double *Sn, int n)
+{
+    int i, j, k;
+    double arg, product;
+    double ReA, ReB, ImA, ImB;
+    
+    arg = 0.0;
+    for(i=1; i<n/2; i++)
+    {
+        j = i;
+        k = n-i;
+        ReA = a[j]; ImA = a[k];
+        ReB = b[j]; ImB = b[k];
+        product = ReA*ReB + ImA*ImB;
+        arg += product/(Sn[i]);
+    }
+    
+    return(4.0*arg);
+    
+}
+
 void fourier_nwip_dual_time(double *abt, double *aA, double *bA, double *aE, double *bE, double *Sn, double Tobs, int n)
 {
     int i, j, k;
