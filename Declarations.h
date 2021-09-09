@@ -16,8 +16,8 @@ struct MBH_Data
 struct Het
 {
     int M;
-    int MM;
-    int MN;
+    int MM; //!<Maximum frequency bin of heterodyne likelihood
+    int MN; //!<Minimum frequency bin of heterodyne likelihood
     int J;
     int NR;
     int Nch;
