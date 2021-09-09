@@ -92,6 +92,9 @@ int main(int argc,char **argv)
     premove = (double*)malloc(sizeof(double)* (NP));
     
     
+    if(LDC == 1)  // LDC = 1 tells the code to analyze LDC data. Otherwise it does a noise-free run on the parameters provided
+    {
+    
     // setting the segment # to -1 causes the code to use the full data set
     
     if(argc<3)
@@ -246,10 +249,76 @@ int main(int argc,char **argv)
     fclose(in);
     free_double_vector(AS);
     free_double_vector(ES);
-    
+        
+        // change to better intrinsic parameterization
+        map_params(2, params);
+        
+    }
+    else // Do a noise-free run on the parameters provided (if looping over a catalog, have the parameters copied into source.dat
+    {
+        
+        if(argc<3)
+           {
+               printf("./PTMCMC Tobs cadence\n");
+               // typical cadence is around 5 seconds.
+               return 0;
+           }
+          
+           dat->Tobs = atof(argv[1]);
+           dat->sqrtTobs = sqrt(dat->Tobs);
+           dat->Tstart = 0.0;
+           dat->Tend = dat->Tobs;
+           dat->dt = atof(argv[2]);
+           dat->Nch = 2;  // only analyze A, E
+           dat->N = (int)(dat->Tobs/dat->dt);
+           dat->SN = double_matrix(dat->Nch,dat->N/2);
+           dat->SM = double_matrix(dat->Nch,dat->N/2);
+           dat->data = double_matrix(dat->Nch,dat->N);
+        
+          in = fopen("source.dat","r");
+          for(i=0; i< NP; i++) fscanf(in,"%lf", &params[i]);
+          fclose(in);
+        
+          // change to better intrinsic parameterization
+          map_params(2, params);
+        
+      
+        
+           for(i=1; i< dat->N/2; i++)
+           {
+               f = (double)(i)/dat->Tobs;
+               instrument_noise(f, &dat->SM[0][i]);
+               dat->SN[0][i] = dat->SM[0][i];
+               dat->SM[1][i] = dat->SM[0][i];
+               dat->SN[1][i] = dat->SM[0][i];
+           }
+        
+            dat->SM[0][0] = dat->SM[0][1];
+            dat->SN[0][0] = dat->SM[0][1];
+            dat->SM[1][0] = dat->SM[0][1];
+            dat->SN[1][0] = dat->SM[0][1];
+        
+        out = fopen("spec.dat","w");
+        for(i=1; i< dat->N/2; i++)
+         {
+            f = (double)(i)/dat->Tobs;
+            fprintf(out, "%e %e\n", f, dat->SM[0][i]);
+         }
+        fclose(out);
+        
+        AS = double_vector(dat->N);
+        ES = double_vector(dat->N);
+        
+        // generate the reference signal (i.e. the "data")
+        ResponseFreq(dat, 2, params, AS, ES);
+        for(i=0; i< dat->N; i++)
+        {
+         dat->data[0][i] = AS[i];
+         dat->data[1][i] = ES[i];
+        }
+          
+    }
 
-    // change to better intrinsic parameterization
-    map_params(2, params);
     
     double **paramx;
     paramx = double_matrix(NC,NP);
@@ -447,7 +516,7 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
     {
     FisherHet(dat, het, ll, paramx[i], Fisher[i]);
     FisherEvec(Fisher[i], ejump[i], evec[i], NP);
-    efix(dat, 2, paramx[i], min, max, ejump[i], evec[i], 1.0);
+    efix(dat, het, 1, ll, paramx[i], min, max, ejump[i], evec[i], 1.0);
     }
 
     av = int_matrix(5,NC);
@@ -524,7 +593,7 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
             {
                 FisherHet(dat, het, ll, paramx[k], Fisher[k]);
                 FisherEvec(Fisher[k], ejump[k], evec[k], NP);
-                efix(dat, 2, paramx[k], min, max, ejump[k], evec[k], 1.0);
+                efix(dat, het, 1, ll, paramx[k], min, max, ejump[k], evec[k], 1.0);
             }
         }
         

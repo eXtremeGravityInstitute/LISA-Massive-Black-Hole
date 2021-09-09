@@ -28,7 +28,7 @@ source search.sh 1 1
 
 In the Sangria training data the first segment to include BH merger is number 1 (the numbering starts at 0). The arguments are the first and last segments searched. Here we are just searching segment 1 since the goal is to demonstrate how the code works, not repeat the entire analysis. To run the entire analysis type
 
-source search.sh 0 12
+source search.sh 0 11
 
 The search code reads in the FFTed data for a segment and the PSD model derived by the SpecFit code. The code makes Scans along the way to demonstrate the signal removal. Note that the initial Qscan differs a little from the one produced by the SpecFit code since the former uses the median/line PSD with the latter uses the spline, Lorentizian fit.
 

@@ -107,6 +107,9 @@
 
 #define MF 4096
 
+/* set to 1 to run on LDC, 0 for a cataliog source */
+#define LDC 1
+
 /* set to 1 for noise level marginalization, 0 otherwise */
 #define nflag 0
 

@@ -69,7 +69,7 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     
     FisherFast(dat, 2, params, fisher);
     FisherEvec(fisher, eval, evec, NP);
-    efix(dat, 2, params, min, max, eval, evec, 50.0);
+    efix(dat, het, 0, 2, params, min, max, eval, evec, 50.0);
     
 
     for (i = 0; i < NP; ++i)
@@ -757,7 +757,7 @@ double log_likelihood_het(struct MBH_Data *dat, struct Het *het, int ll, double 
         
     fullphaseamp(dat, ll, M, params, het->freq, amp[0], amp[1], phase[0], phase[1]);
     
-    out = fopen("check.dat","w");
+    //out = fopen("check.dat","w");
     for(id = 0; id < Nch; id++)
     {
         for(j = 0; j < M; j++)
@@ -773,10 +773,10 @@ double log_likelihood_het(struct MBH_Data *dat, struct Het *het, int ll, double 
             hs[id][j] = ss[id][j]/het->amp[id][j];
             cc[id][j] = hc[id][j]*hc[id][j]+hs[id][j]*hs[id][j];
             }
-            if(id == 0) fprintf(out,"%d %.12e %e %f %f %f\n", j, het->freq[j], het->amp[id][j], hc[id][j], hs[id][j], cc[id][j]);
+            //if(id == 0) fprintf(out,"%d %.12e %e %f %f %f\n", j, het->freq[j], het->amp[id][j], hc[id][j], hs[id][j], cc[id][j]);
         }
     }
-        fclose(out);
+       // fclose(out);
         
         logL = 0.0;
         
@@ -784,8 +784,6 @@ double log_likelihood_het(struct MBH_Data *dat, struct Het *het, int ll, double 
         {
           HH = 0.0;
           HR = 0.0;
-          x = 0.0;
-          y = 0.0;
        
             for(i = 0; i < NR; i++)
             {
@@ -806,9 +804,12 @@ double log_likelihood_het(struct MBH_Data *dat, struct Het *het, int ll, double 
                     }
                 
                 for(j = 0; j <= J; j++) HH += uu[j]*het->SL[i][id][j];
-                if(i < NR-2) x += het->aa[id][i+1]*vv[J];  // correction for overcount
+                if(i < NR-2) HH -= het->aa[id][i+1]*vv[J];  // correction for overcount
                 
                 
+            if(LDC == 1)  // don't need these if noise free
+              {
+                    
                 for(j = 0; j <= J; j++)
                 {
                   vv[j] = hc[id][i*J+j];
@@ -825,7 +826,7 @@ double log_likelihood_het(struct MBH_Data *dat, struct Het *het, int ll, double 
                 
                 for(j = 0; j <= J; j++) HR += uu[j]*het->lc[i][id][j];
                 
-                if(i < NR-2) y += het->rc[id][i+1]*vv[J];  // correction for overcount
+                if(i < NR-2) HR -= het->rc[id][i+1]*vv[J];  // correction for overcount
                 
                 
                     for(j = 0; j <= J; j++)
@@ -844,14 +845,12 @@ double log_likelihood_het(struct MBH_Data *dat, struct Het *het, int ll, double 
                            
                            for(j = 0; j <= J; j++) HR += uu[j]*het->ls[i][id][j];
                            
-                           if(i < NR-2) y += het->rs[id][i+1]*vv[J];  // correction for overcount
+                           if(i < NR-2) HR -= het->rs[id][i+1]*vv[J];  // correction for overcount
+                  
+              }
                 
                // printf("%d %e %e %e %e\n", i, HH, HR, x, y);
         }
-        
-        // correction for overcount of edge values
-        HH -= x;
-        HR -= y;
     
          if(nflag == 1)
          {
@@ -3016,7 +3015,80 @@ void FisherDirect(struct MBH_Data *dat, int ll, double *params, double **Fisher)
     
 }
 
+double chisq_het(struct Data *dat, struct Het *het, int ll, double *params, double **ampR, double **phaseR)
+{
+    double **amp, **phase;
+    double *uu, *vv, **cc;
+    int Nch, M, J, NR;
+    double csq;
+    int i, id, ii, jj, kk;
+    
+    Nch = het->Nch;
+    M = het->M;
+    J = het->J;
+    NR = het->NR;
+    cc = double_matrix(Nch,M);
+    uu = double_vector(J+1);
+    vv = double_vector(J+1);
+    amp = double_matrix(Nch,M);
+    phase = double_matrix(Nch,M);
+    
+    //  phase and amplitude
+    fullphaseamp(dat, ll, M, params, het->freq, amp[0], amp[1], phase[0], phase[1]);
+    
+    
+    csq = 0.0;
+    
+           for (id = 0 ; id < Nch ; id++)  // loop over detectors
+           {
+           
+           // these are the slow terms in the chi-squared sum
+           for(jj = 0; jj < M; jj++)
+           {
+            cc[id][jj] = 0.0;
+            if(het->amp[id][jj] > 0.0)
+             {
+              cc[id][jj] = 4.0*(ampR[id][jj]*ampR[id][jj]+amp[id][jj]*amp[id][jj]-2.0*amp[id][jj]*ampR[id][jj]*cos(phaseR[id][jj]-phase[id][jj]));
+              cc[id][jj] /= (het->amp[id][jj]*het->amp[id][jj]);
+             }
+           }
+    
+       for(ii = 0; ii < NR; ii++)
+        {
+                                                
+           for(jj = 0; jj <= J; jj++)
+           {
+             vv[jj] = cc[id][ii*J+jj];
+             uu[jj] = 0.0;
+           }
+                                                
+           // get Legendre coefficients for slow term
+          for(jj = 0; jj <= J; jj++)
+           {
+           for(kk = 0; kk <= J; kk++)
+            {
+             uu[jj] += het->IP[ii][jj][kk]*vv[kk];
+            }
+           }
+                                                
+           for(jj = 0; jj <= J; jj++) csq += uu[jj]*het->SL[ii][id][jj];
+                                                
+           if(ii < NR-2) csq -= het->aa[id][ii+1]*vv[J];  // correction for overcount
+                                 
+        }
+               
+        }
 
+    
+     free_double_matrix(cc,Nch);
+     free_double_vector(uu);
+     free_double_vector(vv);
+     free_double_matrix(amp,Nch);
+     free_double_matrix(phase,Nch);
+    
+    return(csq);
+    
+}
 
 double chisq(struct MBH_Data *dat, int ll, double *params, double *AR, double *ER)
 {
@@ -3045,7 +3117,7 @@ double chisq(struct MBH_Data *dat, int ll, double *params, double *AR, double *E
     
 }
 
-void efix(struct MBH_Data *dat, int ll, double *params, double *min, double *max, double *eval, double **evec, double zs)
+void efix(struct MBH_Data *dat, struct Het *het, int hr, int ll, double *params, double *min, double *max, double *eval, double **evec, double zs)
 {
     int i, j, k;
     double alpha0, x, z, z0, alpha, alphanew;
@@ -3054,12 +3126,21 @@ void efix(struct MBH_Data *dat, int ll, double *params, double *min, double *max
     double zmx, zmn;
     double dzmin, alpham, zm;
     double *px;
+    double **ampR, **phaseR;
     double *AR, *ER;
     
+    if(hr == 1)  // using heterodyne
+    {
+    ampR = double_matrix(het->Nch,het->M);
+    phaseR = double_matrix(het->Nch,het->M);
+    fullphaseamp(dat, ll, het->M, params, het->freq, ampR[0], ampR[1], phaseR[0], phaseR[1]);
+    }
+    else
+    {
     AR = (double*)malloc(sizeof(double)* (dat->N));
     ER = (double*)malloc(sizeof(double)* (dat->N));
-    
     ResponseFast(dat, ll, params, AR, ER);
+    }
     
     // [0] ln(Mass1)  [1] ln(Mass2)  [2] Spin1 [3] Spin2 [4] phic [5] tc [6] ln(distance)
      // [7] EclipticCoLatitude, [8] EclipticLongitude  [9] polarization, [10] inclination
@@ -3126,7 +3207,14 @@ void efix(struct MBH_Data *dat, int ll, double *params, double *min, double *max
           if(eta < etamin) px[0] = px[1] + 3.0/5.0*log(etamin);
           }
           
+          if(hr == 1)  // using heterodyne
+          {
+          z0 = chisq_het(dat, het, ll, px, ampR, phaseR);
+          }
+          else
+          {
           z0 = chisq(dat, ll, px, AR, ER);
+          }
           
          //printf("B %f %f\n", alpha0, z0);
           
@@ -3192,7 +3280,16 @@ void efix(struct MBH_Data *dat, int ll, double *params, double *min, double *max
             if(eta < etamin) px[0] = px[1] + 3.0/5.0*log(etamin);
             }
             
-            z = chisq(dat, ll, px, AR, ER);
+           
+            
+            if(hr == 1)  // using heterodyne
+            {
+            x = chisq_het(dat, het, ll, px, ampR, phaseR);
+            }
+            else
+            {
+              z = chisq(dat, ll, px, AR, ER);
+            }
             
             //printf("R %f %f\n", alpha, z);
             
@@ -3234,8 +3331,45 @@ void efix(struct MBH_Data *dat, int ll, double *params, double *min, double *max
      }
     
     free_double_vector(px);
-    free(AR);
-    free(ER);
+    
+    if(hr == 1)  // using heterodyne
+    {
+    free_double_matrix(ampR,het->Nch);
+    free_double_matrix(phaseR,het->Nch);
+    }
+    else
+    {
+     free(AR);
+     free(ER);
+    }
+    
+}
+
+void instrument_noise(double f, double *SAE)
+{
+    //Power spectral density of the detector noise and transfer frequency
+    double Sn, red, confusion_noise;
+    double Sloc, fonfs;
+    double f1, f2;
+    double A1, A2, slope, LC;
+    double Sps = 2.25e-22;
+    double Sacc = 9.0e-30;
+    
+    fonfs = f/fstar;
+    
+    //LC = 16.0*fonfs*fonfs;
+    
+    // To match the LDC power spectra I have to divide by 10. No idea why...
+    LC = 1.60*fonfs*fonfs;
+    
+    red = 16.0*((1.0e-4/f)*(1.0e-4/f));
+    // red = 0.0;
+    
+    // Calculate the power spectral density of the detector noise at the given frequency
+    
+    *SAE = LC*16.0/3.0*pow(sin(fonfs),2.0)*( (2.0+cos(fonfs))*(Sps) + 2.0*(3.0+2.0*cos(fonfs)+cos(2.0*fonfs))*(Sacc/pow(2.0*PI*f,4.0)*(1.0+red)) ) / pow(2.0*Larm,2.0);
+    
+   // *SXYZ = LC*4.0*pow(sin(fonfs),2.0)*( 4.0*(Sps) + 8.0*(1.0+pow(cos(fonfs),2.0))*(Sacc/pow(2.0*PI*f,4.0)*(1.0+red)) ) / pow(2.0*Larm,2.0);
     
 }
 

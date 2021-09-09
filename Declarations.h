@@ -48,6 +48,7 @@ double SNRFast(struct MBH_Data *dat, int ll, double *params);
 void SetUp(struct MBH_Data *dat, int ll, double *params, int NFmax, int *NFS, double *FF);
 void StartStop(int ll, double *params, double Tstart, double Tend, double dt, double *fstart, double *fstop, double *frg);
 void Intrinsic(int ll, double *params, double Tobs, int NF, double *FF, double *TF, double *PF, double *AF);
+<<<<<<< HEAD
 void ResponseFast(struct MBH_Data *dat, int ll, double *params, double *AS, double *ES);
 double Likelihood(struct MBH_Data *dat, int ll, double *params);
 double Likelihood_check(struct MBH_Data *dat, struct Het *het, int ll, double *params);
@@ -55,6 +56,16 @@ double Likelihood_Slow(struct MBH_Data *dat, int ll, double *params);
 void ResponseFreq(struct MBH_Data *dat, int ll, double *params, double *AS, double *ES);
 double chisq(struct MBH_Data *dat, int ll, double *params, double *AR, double *ER);
 void heterodyne(struct MBH_Data *dat, struct Het *het, int ll, double *params);
+=======
+void ResponseFast(struct Data *dat, int ll, double *params, double *AS, double *ES);
+double Likelihood(struct Data *dat, int ll, double *params);
+double Likelihood_check(struct Data *dat, struct Het *het, int ll, double *params);
+double Likelihood_Slow(struct Data *dat, int ll, double *params);
+void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *ES);
+double chisq(struct Data *dat, int ll, double *params, double *AR, double *ER);
+double chisq_het(struct Data *dat, struct Het *het, int ll, double *params, double **ampR, double **phaseR);
+void heterodyne(struct Data *dat, struct Het *het, int ll, double *params);
+>>>>>>> main
 void legendre_maker(int J, int U, double **P);
 void fullphaseamp(struct MBH_Data *dat, int ll, int K, double *params, double *freq, double *Aamp, double *Eamp, double *Aphase, double *Ephase);
 double log_likelihood_het(struct MBH_Data *dat, struct Het *het, int ll, double *params, double *sx);
@@ -94,9 +105,9 @@ void timearray(double *params, RealVector *freq, long N, double *TF, AmpPhaseFDW
 double fourier_nwip(double *a, double *b, double *Sn, int n);
 double FofT(int ll, double Tobs, double *params, double *frg, double dt, double tref);
 void Extrinsic(double *params, double Tstart, double Tend, int NF, double *FF, double *TF, double *PF, double *AF, double *AAmp, double *EAmp, double *APhase, double *EPhase, double *kxm);
-void efix(struct MBH_Data *dat, int ll, double *params, double *min, double *max, double *eval, double **evec, double zs);
+void efix(struct MBH_Data *dat, struct Het *het, int hr, int ll, double *params, double *min, double *max, double *eval, double **evec, double zs);
 void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, double *min, double *max);
-
+void instrument_noise(double f, double *SAE);
 void getfreq(double Tend, double *fnew, double *tf, double *Amp, double *Phase, double t, double fguess, double phic, double fRef_in, double m1_SI, double m2_SI, double chi1, double chi2, double distance, double tc);
 void update(struct MBH_Data *dat, struct Het *het, int typ, int k, int ll, double *logLx, double **paramx, double **paramy, double **sx, double **sy, double *min, double *max, int *who, double *heat, double ***history, int NH, double **ejump, double ***evec, int **cv, int **av, gsl_rng *r);
 double Likelihood(struct MBH_Data *dat, int ll, double *params);
