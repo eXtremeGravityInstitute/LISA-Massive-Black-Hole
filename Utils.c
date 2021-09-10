@@ -433,9 +433,9 @@ void Ext_In(int ll, double *params, double **Fisher, double **eChl, double **iCh
     double **CovE, **CovI;
     double *scale;
     
-    kk = NP-NE;
+    kk = NParams-NE;
     
-    scale = (double*)malloc(sizeof(double)* (NP));
+    scale = (double*)malloc(sizeof(double)* (NParams));
     
     FishE = double_matrix(NE,NE);
     CovE = double_matrix(NE,NE);
@@ -455,7 +455,7 @@ void Ext_In(int ll, double *params, double **Fisher, double **eChl, double **iCh
    // Fisher uses log derivatives on m1, m2, DL. Want to switch to linear derivatives since using
    // uniform prior in m1, m2 and DL
 
-    for(j = 0; j < NP; j++) scale[j] = 1.0;
+    for(j = 0; j < NParams; j++) scale[j] = 1.0;
     
     if(ll==0)
     {
@@ -772,7 +772,7 @@ void FisherEvecSplit(double **fish, double *ej, double **ev, int d)
         {
             for (j = 0 ; j < NEX ; j++)
             {
-                gsl_matrix_set(mx, i, j, cov[i+(NP-NEX)][j+(NP-NEX)]);
+                gsl_matrix_set(mx, i, j, cov[i+(NParams-NEX)][j+(NParams-NEX)]);
             }
         }
         
@@ -797,7 +797,7 @@ void FisherEvecSplit(double **fish, double *ej, double **ev, int d)
             // printf("eigenvalue = %g\n", ej[i]);
             for (j = 0 ; j < NEX ; j++)
             {
-                ev[i+NIN-1][j+NP-NEX] = gsl_matrix_get(evecx, j, i);
+                ev[i+NIN-1][j+NParams-NEX] = gsl_matrix_get(evecx, j, i);
                 // printf("%f ", ev[i][j]);
             }
             // printf("\n");

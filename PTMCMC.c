@@ -44,6 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // Linux
 // gcc -std=gnu99 -fopenmp -w -o PTMCMC PTMCMC.c IMRPhenomD_internals.c IMRPhenomD.c Utils.c Response.c -lgsl -lgslcblas  -lm
 
+/* total number of chains */
+#define NC 24
+
 void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **params);
 
 int main(int argc,char **argv)

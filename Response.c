@@ -59,22 +59,22 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     J = 2;
     tol = 0.00001;
 
-    dparams = double_matrix(NP,NP);
-    fisher = double_matrix(NP,NP);
-    evec = double_matrix(NP,NP);
-    eval = double_vector(NP);
-    px = double_vector(NP);
+    dparams = double_matrix(NParams,NParams);
+    fisher = double_matrix(NParams,NParams);
+    evec = double_matrix(NParams,NParams);
+    eval = double_vector(NParams);
+    px = double_vector(NParams);
     
     dfa = double_vector(N/2);
     
     FisherFast(dat, 2, params, fisher);
-    FisherEvec(fisher, eval, evec, NP);
+    FisherEvec(fisher, eval, evec, NParams);
     efix(dat, het, 0, 2, params, min, max, eval, evec, 50.0);
     
 
-    for (i = 0; i < NP; ++i)
+    for (i = 0; i < NParams; ++i)
     {
-        for (j = 0; j < NP; ++j) px[j] = params[j] + eval[i]*evec[i][j];
+        for (j = 0; j < NParams; ++j) px[j] = params[j] + eval[i]*evec[i][j];
         
          if(ll == 2)
           {
@@ -82,7 +82,7 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
            eta = exp(leta);
            if(eta > 0.25)
            {
-           for (j = 0; j < NP; ++j) px[j] = params[j] - alpha0*eval[i]*evec[i][j];
+           for (j = 0; j < NParams; ++j) px[j] = params[j] - alpha0*eval[i]*evec[i][j];
            }
           }
           
@@ -105,8 +105,8 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
           while(px[9] > PI)   px[9] -= PI;
           while(px[9] < 0.0)  px[9] += PI;
         
-          for (j = 0; j < NP; ++j) if(px[j] > max[j]) px[j] = max[j];
-          for (j = 0; j < NP; ++j) if(px[j] < min[j]) px[j] = min[j];
+          for (j = 0; j < NParams; ++j) if(px[j] > max[j]) px[j] = max[j];
+          for (j = 0; j < NParams; ++j) if(px[j] < min[j]) px[j] = min[j];
             
           if(ll == 2)
             {
@@ -117,7 +117,7 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
             }
 
         
-        for (j = 0; j < NP; ++j) dparams[i][j] = px[j];
+        for (j = 0; j < NParams; ++j) dparams[i][j] = px[j];
                    
         }
     
@@ -128,12 +128,12 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     
     
     Ar = double_matrix(Nch,NF);
-    Ap = double_tensor(NP,Nch,NF);
+    Ap = double_tensor(NParams,Nch,NF);
     Pr = double_matrix(Nch,NF);
-    Pp = double_tensor(NP,Nch,NF);
-    Cs = double_tensor(NP,Nch,NF);
-    Sn = double_tensor(NP,Nch,NF);
-    DH = double_tensor(NP,Nch,NF);
+    Pp = double_tensor(NParams,Nch,NF);
+    Cs = double_tensor(NParams,Nch,NF);
+    Sn = double_tensor(NParams,Nch,NF);
+    DH = double_tensor(NParams,Nch,NF);
     
     TF = (double*)malloc(sizeof(double)* (NF));
     PF = (double*)malloc(sizeof(double)* (NF));
@@ -143,11 +143,11 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     fullphaseamp(dat, ll, NF, params, FF, Ar[0], Ar[1], Pr[0], Pr[1]);
     
     // perturbed amplitude and phase
-    for(i = 0; i < NP; i++) fullphaseamp(dat, ll, NF, dparams[i], FF, Ap[i][0], Ap[i][1], Pp[i][0], Pp[i][1]);
+    for(i = 0; i < NParams; i++) fullphaseamp(dat, ll, NF, dparams[i], FF, Ap[i][0], Ap[i][1], Pp[i][0], Pp[i][1]);
     
     
     // phase difference vs frequency and ampltide ratio vs frequency
-    for(i = 0; i < NP; i++)
+    for(i = 0; i < NParams; i++)
     {
         for(id = 0; id < Nch; id++)
         {
@@ -175,7 +175,7 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
       for(j = 0; j < NF; j++)
         {
         fprintf(out, "%e ", FF[j]);
-        for(i = 0; i < NP; i++) fprintf(out, "%e %e %e ", Cs[i][0][j], Sn[i][0][j], DH[i][0][j]);
+        for(i = 0; i < NParams; i++) fprintf(out, "%e %e %e ", Cs[i][0][j], Sn[i][0][j], DH[i][0][j]);
         fprintf(out, "\n");
         }
         
@@ -212,7 +212,7 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
            
             for(id = 0; id < Nch; id++)
               {
-                  for(i = 0; i < NP; i++)
+                  for(i = 0; i < NParams; i++)
                   {
                       cmid = (Cs[i][id][jmin]*(FF[j]-FF[jmid])+ Cs[i][id][j]*(FF[jmid]-FF[jmin]))/(FF[j]-FF[jmin]);
                       smid = (Sn[i][id][jmin]*(FF[j]-FF[jmid])+ Sn[i][id][j]*(FF[jmid]-FF[jmin]))/(FF[j]-FF[jmin]);
@@ -368,7 +368,10 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     
         het->MN = fgflat[0];
         het->MM = fgflat[M-1]+1;
-
+    
+    //store min and max frequency in MBH_Data structure
+    dat->fmin = (double)het->MN/dat->Tobs;
+    dat->fmax = (double)het->MM/dat->Tobs;
     
     free(FF);
     free(TF);
@@ -379,19 +382,19 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     free_double_vector(dfa);
     //free_double_vector(ratio);
     //free_int_vector(stst);
-    free_double_matrix(dparams,NP);
-    free_double_matrix(fisher,NP);
-    free_double_matrix(evec,NP);
+    free_double_matrix(dparams,NParams);
+    free_double_matrix(fisher,NParams);
+    free_double_matrix(evec,NParams);
     free_double_vector(eval);
     free_double_vector(px);
     free_double_vector(fgrid);
     free_double_matrix(Ar,Nch);
-    free_double_tensor(Ap,NP,Nch);
+    free_double_tensor(Ap,NParams,Nch);
     free_double_matrix(Pr,Nch);
-    free_double_tensor(Pp,NP,Nch);
-    free_double_tensor(Cs,NP,Nch);
-    free_double_tensor(Sn,NP,Nch);
-    free_double_tensor(DH,NP,Nch);
+    free_double_tensor(Pp,NParams,Nch);
+    free_double_tensor(Cs,NParams,Nch);
+    free_double_tensor(Sn,NParams,Nch);
+    free_double_tensor(DH,NParams,Nch);
     
 }
 
@@ -484,11 +487,11 @@ void heterodyne(struct MBH_Data *dat, struct Het *het, int ll, double *params)
     het->ls = double_tensor(NR,Nch,J+1);
     het->ldc = double_tensor(NR,Nch,J+1);
     het->lds = double_tensor(NR,Nch,J+1);
-    het->pref = double_vector(NP);  // keep a copy of the source parameters used for the heterodyne
+    het->pref = double_vector(NParams);  // keep a copy of the source parameters used for the heterodyne
     het->logLR = double_vector(Nch); // reference likelihood in each channel
     het->DD = double_vector(Nch); // data inner product (used when fitting noise level)
     
-    for(j = 0; j < NP; j++) het->pref[j] = params[j];
+    for(j = 0; j < NParams; j++) het->pref[j] = params[j];
     
     hb = double_matrix(Nch,N);
     rb = double_matrix(Nch,N);
@@ -908,7 +911,7 @@ double Fstat_het(struct MBH_Data *dat, struct Het *het, int ll, double *params, 
     J = het->J;
     NR = het->NR;
 
-    Fparams = double_matrix(4,NP);
+    Fparams = double_matrix(4,NParams);
     amp = double_tensor(4,Nch,M);
     phase = double_tensor(4,Nch,M);
         
@@ -921,7 +924,7 @@ double Fstat_het(struct MBH_Data *dat, struct Het *het, int ll, double *params, 
         
     for(i = 0; i < 4; i++)
       {
-          for(j = 0; j < NP; j++) Fparams[i][j] = params[j];
+          for(j = 0; j < NParams; j++) Fparams[i][j] = params[j];
           Fparams[i][10] = 0.0;
       }
         
@@ -1705,9 +1708,9 @@ void FisherFast(struct MBH_Data *dat, int ll, double *params, double **Fisher)
     Tend = dat->Tend;
     Tobs = dat->Tobs;
     
-    epsilon = (double*)malloc(sizeof(double)* (NP));
-    paramsP = (double*)malloc(sizeof(double)* (NP));
-    paramsM = (double*)malloc(sizeof(double)* (NP));
+    epsilon = (double*)malloc(sizeof(double)* (NParams));
+    paramsP = (double*)malloc(sizeof(double)* (NParams));
+    paramsM = (double*)malloc(sizeof(double)* (NParams));
     
     FF = (double*)malloc(sizeof(double)* (NFmax));
     
@@ -1755,11 +1758,11 @@ void FisherFast(struct MBH_Data *dat, int ll, double *params, double **Fisher)
     EampP = (double*)malloc(sizeof(double)* (NF));
     EampM = (double*)malloc(sizeof(double)* (NF));
     
-    DphaseA = double_matrix(NP, NF);
-    DampA = double_matrix(NP, NF);
+    DphaseA = double_matrix(NParams, NF);
+    DampA = double_matrix(NParams, NF);
     
-    DphaseE = double_matrix(NP, NF);
-    DampE = double_matrix(NP, NF);
+    DphaseE = double_matrix(NParams, NF);
+    DampE = double_matrix(NParams, NF);
  
     
     AAmp = (double*)malloc(sizeof(double)* (NF));
@@ -1792,7 +1795,7 @@ void FisherFast(struct MBH_Data *dat, int ll, double *params, double **Fisher)
     for (i=0; i< 4; i++)
     {
         
-        for (j=0; j< NP; j++)
+        for (j=0; j< NParams; j++)
         {
             paramsP[j] = params[j];
             paramsM[j] = params[j];
@@ -1873,10 +1876,10 @@ void FisherFast(struct MBH_Data *dat, int ll, double *params, double **Fisher)
            }
 
 
-      for (i=7; i< NP; i++)
+      for (i=7; i< NParams; i++)
        {
     
-       for (j=0; j< NP; j++)
+       for (j=0; j< NParams; j++)
         {
         paramsP[j] = params[j];
         paramsM[j] = params[j];
@@ -1907,9 +1910,9 @@ void FisherFast(struct MBH_Data *dat, int ll, double *params, double **Fisher)
     gsl_spline *IEspline = gsl_spline_alloc (gsl_interp_cspline, NF);
 
     
-    for (i=0; i< NP; i++)
+    for (i=0; i< NParams; i++)
     {
-        for (j=i; j< NP; j++)
+        for (j=i; j< NParams; j++)
         {
   
             for (k=0; k< NF; k++)
@@ -1927,19 +1930,19 @@ void FisherFast(struct MBH_Data *dat, int ll, double *params, double **Fisher)
         
     }
     
-    for (i=0; i< NP; i++)
+    for (i=0; i< NParams; i++)
     {
-        for (j=i+1; j< NP; j++)
+        for (j=i+1; j< NParams; j++)
         {
             Fisher[j][i] =  Fisher[i][j];
         }
     }
     
     
-    free_double_matrix(DphaseA,NP);
-    free_double_matrix(DampA,NP);
-    free_double_matrix(DphaseE,NP);
-    free_double_matrix(DampE,NP);
+    free_double_matrix(DphaseA,NParams);
+    free_double_matrix(DampA,NParams);
+    free_double_matrix(DphaseE,NParams);
+    free_double_matrix(DampE,NParams);
  
     free(epsilon);
     free(SADS);
@@ -2010,16 +2013,16 @@ void FisherHet(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     Tend = dat->Tend;
     Tobs = dat->Tobs;
     
-    epsilon = (double*)malloc(sizeof(double)* (NP));
-    paramsP = (double*)malloc(sizeof(double)* (NP));
-    paramsM = (double*)malloc(sizeof(double)* (NP));
+    epsilon = (double*)malloc(sizeof(double)* (NParams));
+    paramsP = (double*)malloc(sizeof(double)* (NParams));
+    paramsM = (double*)malloc(sizeof(double)* (NParams));
     
     amp = double_matrix(Nch,M);
     phase = double_matrix(Nch,M);
-    ampP = double_tensor(NP,Nch,M);
-    phaseP = double_tensor(NP,Nch,M);
-    ampM = double_tensor(NP,Nch,M);
-    phaseM = double_tensor(NP,Nch,M);
+    ampP = double_tensor(NParams,Nch,M);
+    phaseP = double_tensor(NParams,Nch,M);
+    ampM = double_tensor(NParams,Nch,M);
+    phaseM = double_tensor(NParams,Nch,M);
     
     // Reference phase and amplitude
     fullphaseamp(dat, ll, M, params, het->freq, amp[0], amp[1], phase[0], phase[1]);
@@ -2041,10 +2044,10 @@ void FisherHet(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
       epsilon[9] = 1.0e-5;
       epsilon[10] = 1.0e-5;
     
-    for (i=0; i< NP; i++)
+    for (i=0; i< NParams; i++)
     {
         
-        for (j=0; j< NP; j++)
+        for (j=0; j< NParams; j++)
         {
             paramsP[j] = params[j];
             paramsM[j] = params[j];
@@ -2090,14 +2093,14 @@ void FisherHet(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     }
 
 
-    for (i = 0; i < NP; i++)
+    for (i = 0; i < NParams; i++)
     {
-        for (j = 0; j < NP; j++) Fisher[i][j] = 0.0;
+        for (j = 0; j < NParams; j++) Fisher[i][j] = 0.0;
     }
     
-        for (i = 0 ; i < NP ; i++)
+        for (i = 0 ; i < NParams ; i++)
         {
-            for (j = i ; j < NP ; j++)
+            for (j = i ; j < NParams ; j++)
             {
                 
                 for (id = 0 ; id < Nch ; id++)  // loop over detectors
@@ -2147,9 +2150,9 @@ void FisherHet(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     }
 
 
-    for (i=0; i< NP; i++)
+    for (i=0; i< NParams; i++)
     {
-        for (j=i+1; j< NP; j++)
+        for (j=i+1; j< NParams; j++)
         {
             Fisher[j][i] =  Fisher[i][j];
         }
@@ -2166,10 +2169,10 @@ void FisherHet(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     
     free_double_matrix(amp,Nch);
     free_double_matrix(phase,Nch);
-    free_double_tensor(ampP,NP,Nch);
-    free_double_tensor(phaseP,NP,Nch);
-    free_double_tensor(ampM,NP,Nch);
-    free_double_tensor(phaseM,NP,Nch);
+    free_double_tensor(ampP,NParams,Nch);
+    free_double_tensor(phaseP,NParams,Nch);
+    free_double_tensor(ampM,NParams,Nch);
+    free_double_tensor(phaseM,NParams,Nch);
     
     
     
@@ -2204,16 +2207,16 @@ void FisherSubHet(struct MBH_Data *dat, struct Het *het, int ll, int *pmap, doub
     Tend = dat->Tend;
     Tobs = dat->Tobs;
     
-    epsilon = (double*)malloc(sizeof(double)* (NP));
-    paramsP = (double*)malloc(sizeof(double)* (NP));
-    paramsM = (double*)malloc(sizeof(double)* (NP));
+    epsilon = (double*)malloc(sizeof(double)* (NParams));
+    paramsP = (double*)malloc(sizeof(double)* (NParams));
+    paramsM = (double*)malloc(sizeof(double)* (NParams));
     
     amp = double_matrix(Nch,M);
     phase = double_matrix(Nch,M);
-    ampP = double_tensor(NP,Nch,M);
-    phaseP = double_tensor(NP,Nch,M);
-    ampM = double_tensor(NP,Nch,M);
-    phaseM = double_tensor(NP,Nch,M);
+    ampP = double_tensor(NParams,Nch,M);
+    phaseP = double_tensor(NParams,Nch,M);
+    ampM = double_tensor(NParams,Nch,M);
+    phaseM = double_tensor(NParams,Nch,M);
     
     // Reference phase and amplitude
     fullphaseamp(dat, ll, M, params, het->freq, amp[0], amp[1], phase[0], phase[1]);
@@ -2235,12 +2238,12 @@ void FisherSubHet(struct MBH_Data *dat, struct Het *het, int ll, int *pmap, doub
       epsilon[9] = 1.0e-5;
       epsilon[10] = 1.0e-5;
     
-    for (i=0; i< NP; i++)
+    for (i=0; i< NParams; i++)
     {
         if(pmap[i] > -1)
          {
                    
-        for (j=0; j< NP; j++)
+        for (j=0; j< NParams; j++)
         {
             paramsP[j] = params[j];
             paramsM[j] = params[j];
@@ -2288,19 +2291,19 @@ void FisherSubHet(struct MBH_Data *dat, struct Het *het, int ll, int *pmap, doub
     }
 
 
-    for (i = 0; i < NP; i++)
+    for (i = 0; i < NParams; i++)
     {
         if(pmap[i] > -1)
             {
-        for (j = 0; j < NP; j++) if(pmap[j] > -1) Fisher[pmap[i]][pmap[j]] = 0.0;
+        for (j = 0; j < NParams; j++) if(pmap[j] > -1) Fisher[pmap[i]][pmap[j]] = 0.0;
             }
     }
     
-        for (i = 0 ; i < NP ; i++)
+        for (i = 0 ; i < NParams ; i++)
         {
             if(pmap[i] > -1)
             {
-            for (j = i ; j < NP ; j++)
+            for (j = i ; j < NParams ; j++)
             {
                 if(pmap[j] > -1)
                 {
@@ -2349,12 +2352,12 @@ void FisherSubHet(struct MBH_Data *dat, struct Het *het, int ll, int *pmap, doub
         }  // fi pmap[i] > -1
       }  // i loop
 
-    for (i=0; i< NP; i++)
+    for (i=0; i< NParams; i++)
        {
            if(pmap[i] > -1)
            {
                
-           for (j=i+1; j< NP; j++)
+           for (j=i+1; j< NParams; j++)
            {
                if(pmap[j] > -1)
                {
@@ -2375,10 +2378,10 @@ void FisherSubHet(struct MBH_Data *dat, struct Het *het, int ll, int *pmap, doub
     
     free_double_matrix(amp,Nch);
     free_double_matrix(phase,Nch);
-    free_double_tensor(ampP,NP,Nch);
-    free_double_tensor(phaseP,NP,Nch);
-    free_double_tensor(ampM,NP,Nch);
-    free_double_tensor(phaseM,NP,Nch);
+    free_double_tensor(ampP,NParams,Nch);
+    free_double_tensor(phaseP,NParams,Nch);
+    free_double_tensor(ampM,NParams,Nch);
+    free_double_tensor(phaseM,NParams,Nch);
     
     
     
@@ -2407,9 +2410,9 @@ void FisherSub(struct MBH_Data *dat, int ll, int *pmap, double *params, double *
     Tend = dat->Tend;
     Tobs = dat->Tobs;
 
-    epsilon = (double*)malloc(sizeof(double)* (NP));
-    paramsP = (double*)malloc(sizeof(double)* (NP));
-    paramsM = (double*)malloc(sizeof(double)* (NP));
+    epsilon = (double*)malloc(sizeof(double)* (NParams));
+    paramsP = (double*)malloc(sizeof(double)* (NParams));
+    paramsM = (double*)malloc(sizeof(double)* (NParams));
     
     FF = (double*)malloc(sizeof(double)* (NFmax));
     
@@ -2454,11 +2457,11 @@ void FisherSub(struct MBH_Data *dat, int ll, int *pmap, double *params, double *
     EampP = (double*)malloc(sizeof(double)* (NF));
     EampM = (double*)malloc(sizeof(double)* (NF));
     
-    DphaseA = double_matrix(NP, NF);
-    DampA = double_matrix(NP, NF);
+    DphaseA = double_matrix(NParams, NF);
+    DampA = double_matrix(NParams, NF);
     
-    DphaseE = double_matrix(NP, NF);
-    DampE = double_matrix(NP, NF);
+    DphaseE = double_matrix(NParams, NF);
+    DampE = double_matrix(NParams, NF);
     
     
     AAmp = (double*)malloc(sizeof(double)* (NF));
@@ -2491,7 +2494,7 @@ void FisherSub(struct MBH_Data *dat, int ll, int *pmap, double *params, double *
         if(pmap[i] > -1)
         {
         
-        for (j=0; j< NP; j++)
+        for (j=0; j< NParams; j++)
         {
             paramsP[j] = params[j];
             paramsM[j] = params[j];
@@ -2585,12 +2588,12 @@ void FisherSub(struct MBH_Data *dat, int ll, int *pmap, double *params, double *
         }
     }
     
-    for (i=7; i< NP; i++)
+    for (i=7; i< NParams; i++)
     {
         if(pmap[i] > -1)
         {
             
-        for (j=0; j< NP; j++)
+        for (j=0; j< NParams; j++)
         {
             paramsP[j] = params[j];
             paramsM[j] = params[j];
@@ -2624,12 +2627,12 @@ void FisherSub(struct MBH_Data *dat, int ll, int *pmap, double *params, double *
     
     
     
-    for (i=0; i< NP; i++)
+    for (i=0; i< NParams; i++)
     {
         if(pmap[i] > -1)
         {
             
-        for (j=i; j< NP; j++)
+        for (j=i; j< NParams; j++)
         {
             if(pmap[j] > -1)
             {
@@ -2653,12 +2656,12 @@ void FisherSub(struct MBH_Data *dat, int ll, int *pmap, double *params, double *
         
     }
     
-    for (i=0; i< NP; i++)
+    for (i=0; i< NParams; i++)
     {
         if(pmap[i] > -1)
         {
             
-        for (j=i+1; j< NP; j++)
+        for (j=i+1; j< NParams; j++)
         {
             if(pmap[j] > -1)
             {
@@ -2669,10 +2672,10 @@ void FisherSub(struct MBH_Data *dat, int ll, int *pmap, double *params, double *
         }
     }
     
-    free_double_matrix(DphaseA,NP);
-    free_double_matrix(DampA,NP);
-    free_double_matrix(DphaseE,NP);
-    free_double_matrix(DampE,NP);
+    free_double_matrix(DphaseA,NParams);
+    free_double_matrix(DampA,NParams);
+    free_double_matrix(DphaseE,NParams);
+    free_double_matrix(DampE,NParams);
     
     free(epsilon);
     free(SADS);
@@ -2845,9 +2848,9 @@ void efix(struct MBH_Data *dat, struct Het *het, int hr, int ll, double *params,
     zmx = zs*2.0;
     zmn = zs/2.0;
     
-    px = double_vector(NP);
+    px = double_vector(NParams);
 
-   for (i = 0; i < NP; ++i)
+   for (i = 0; i < NParams; ++i)
      {
          
         dzmin = 1.0e20;
@@ -2859,7 +2862,7 @@ void efix(struct MBH_Data *dat, struct Het *het, int hr, int ll, double *params,
       k = 0;
       do
       {
-      for (j = 0; j < NP; ++j) px[j] = params[j] + alpha0*eval[i]*evec[i][j];
+      for (j = 0; j < NParams; ++j) px[j] = params[j] + alpha0*eval[i]*evec[i][j];
       
       if(ll == 2)
           {
@@ -2867,7 +2870,7 @@ void efix(struct MBH_Data *dat, struct Het *het, int hr, int ll, double *params,
         eta = exp(leta);
          if(eta > 0.25)
          {
-         for (j = 0; j < NP; ++j) px[j] = params[j] - alpha0*eval[i]*evec[i][j];
+         for (j = 0; j < NParams; ++j) px[j] = params[j] - alpha0*eval[i]*evec[i][j];
          }
           }
           
@@ -2890,11 +2893,11 @@ void efix(struct MBH_Data *dat, struct Het *het, int hr, int ll, double *params,
           while(px[9] > PI)   px[9] -= PI;
           while(px[9] < 0.0)  px[9] += PI;
           
-         // for (j = 0; j < NP; ++j) printf("%d %e %e %e %e\n", j, px[j], params[j], min[j], max[j]);
+         // for (j = 0; j < NParams; ++j) printf("%d %e %e %e %e\n", j, px[j], params[j], min[j], max[j]);
           
           
-          for (j = 0; j < NP; ++j) if(px[j] > max[j]) px[j] = max[j];
-          for (j = 0; j < NP; ++j) if(px[j] < min[j]) px[j] = min[j];
+          for (j = 0; j < NParams; ++j) if(px[j] > max[j]) px[j] = max[j];
+          for (j = 0; j < NParams; ++j) if(px[j] < min[j]) px[j] = min[j];
       
           if(ll == 2)
           {
@@ -2936,7 +2939,7 @@ void efix(struct MBH_Data *dat, struct Het *het, int hr, int ll, double *params,
         k = 0;
         do
         {
-        for (j = 0; j < NP; ++j) px[j] = params[j] + alpha*eval[i]*evec[i][j];
+        for (j = 0; j < NParams; ++j) px[j] = params[j] + alpha*eval[i]*evec[i][j];
          
         if(ll == 2)
         {
@@ -2944,7 +2947,7 @@ void efix(struct MBH_Data *dat, struct Het *het, int hr, int ll, double *params,
         eta = exp(leta);
         if(eta > 0.25)
         {
-          for (j = 0; j < NP; ++j) px[j] = params[j] - alpha*eval[i]*evec[i][j];
+          for (j = 0; j < NParams; ++j) px[j] = params[j] - alpha*eval[i]*evec[i][j];
         }
         }
             
@@ -2966,8 +2969,8 @@ void efix(struct MBH_Data *dat, struct Het *het, int hr, int ll, double *params,
         while(px[9] > PI)   px[9] -= PI;
         while(px[9] < 0.0)  px[9] += PI;
             
-        for (j = 0; j < NP; ++j) if(px[j] > max[j]) px[j] = max[j];
-        for (j = 0; j < NP; ++j) if(px[j] < min[j]) px[j] = min[j];
+        for (j = 0; j < NParams; ++j) if(px[j] > max[j]) px[j] = max[j];
+        for (j = 0; j < NParams; ++j) if(px[j] < min[j]) px[j] = min[j];
             
             if(ll == 2)
             {
@@ -4505,10 +4508,10 @@ void update(struct MBH_Data *dat, struct Het *het, int typ, int k, int ll, doubl
         
         // pick an eigendirection to jump in
         beta = gsl_rng_uniform(r);
-        i = (int)(beta*(NP));
+        i = (int)(beta*(NParams));
         // draw the jump size
         beta = sqrt(heat[k])*ejump[q][i]*gsl_ran_gaussian(r,1.0);
-        for(j = 0; j < NP; j++) paramy[q][j] = paramx[q][j]+beta*evec[q][i][j];
+        for(j = 0; j < NParams; j++) paramy[q][j] = paramx[q][j]+beta*evec[q][i][j];
         
         tx = -1.0;
     }
@@ -4517,7 +4520,7 @@ void update(struct MBH_Data *dat, struct Het *het, int typ, int k, int ll, doubl
         
         // the history file is kept for each temperature
         
-        de_jump(paramx[q], paramy[q], history[k], NH, NP, r);
+        de_jump(paramx[q], paramy[q], history[k], NH, NParams, r);
         
         tx = Tmerger(paramx[q],paramx[q][5]);
         
@@ -4559,9 +4562,9 @@ void update(struct MBH_Data *dat, struct Het *het, int typ, int k, int ll, doubl
         Svec = double_matrix(4,4);
         Sval = double_vector(4);
         
-        pmap = (int*)malloc(sizeof(int)* (NP));
+        pmap = (int*)malloc(sizeof(int)* (NParams));
         Fish = double_matrix(4,4);
-        params = (double*)malloc(sizeof(double)* (NP));
+        params = (double*)malloc(sizeof(double)* (NParams));
         
         pmap[0] = pmap[1] = pmap[2] = pmap[3] = -1;
         pmap[5] = pmap[7] = pmap[8] = -1;
@@ -4571,7 +4574,7 @@ void update(struct MBH_Data *dat, struct Het *het, int typ, int k, int ll, doubl
         pmap[10] = 3;
         
         
-        for(j = 0; j < NP; j++) params[j] = paramx[q][j];
+        for(j = 0; j < NParams; j++) params[j] = paramx[q][j];
         tx = -1.0;  // time offset will be at correct value, no need to maximize
              
         lglx = Fstat_het(dat, het, ll, params, sx[q], tx);
@@ -4624,11 +4627,11 @@ void update(struct MBH_Data *dat, struct Het *het, int typ, int k, int ll, doubl
         FisherSubHet(dat, het, ll, pmap, params, Fish);
         
         qx = 0.0;
-        for (i=0; i< NP; i++)
+        for (i=0; i< NParams; i++)
         {
             if(pmap[i] > -1)
             {
-              for (j=0; j< NP; j++)
+              for (j=0; j< NParams; j++)
                {
                 if(pmap[j] > -1) qx -= 0.5*Fish[pmap[i]][pmap[j]]*(paramx[q][i]-params[i])*(paramx[q][j]-params[j]);
                }
@@ -4647,7 +4650,7 @@ void update(struct MBH_Data *dat, struct Het *het, int typ, int k, int ll, doubl
         qx += 0.5*log(x);
         
         
-        for(j = 0; j < NP; j++) params[j] = paramx[q][j];
+        for(j = 0; j < NParams; j++) params[j] = paramx[q][j];
         params[7] = cth;
         params[8] = phi;
         
@@ -4660,24 +4663,24 @@ void update(struct MBH_Data *dat, struct Het *het, int typ, int k, int ll, doubl
         
         FisherEvec(Fish, Sval, Svec, 4);
         
-        for(j = 0; j < NP; j++) paramy[q][j] = params[j];
+        for(j = 0; j < NParams; j++) paramy[q][j] = params[j];
         
         // pick an eigendirection to jump in
         beta = gsl_rng_uniform(r);
         i = (int)(beta*4);
         // draw the jump size
         beta = sqrt(heat[k])*Sval[i]*gsl_ran_gaussian(r,1.0);
-        for(j = 0; j < NP; j++)
+        for(j = 0; j < NParams; j++)
         {
           if(pmap[j] > -1) paramy[q][j] = params[j]+beta*Svec[i][pmap[j]];
         }
         
         qy = 0.0;
-        for (i=0; i< NP; i++)
+        for (i=0; i< NParams; i++)
         {
             if(pmap[i] > -1)
             {
-                for (j=0; j< NP; j++)
+                for (j=0; j< NParams; j++)
                 {
                     if(pmap[j] > -1) qy -= 0.5*Fish[pmap[i]][pmap[j]]*(paramy[q][i]-params[i])*(paramy[q][j]-params[j]);
                 }
@@ -4791,7 +4794,7 @@ void update(struct MBH_Data *dat, struct Het *het, int typ, int k, int ll, doubl
     
     // check proposed values are in prior range
     flag = 0;
-    for(i = 0; i < NP; i++)
+    for(i = 0; i < NParams; i++)
     {
         if(paramy[q][i] > max[i] || paramy[q][i] < min[i]) flag = 1;
     }
@@ -4877,7 +4880,7 @@ void update(struct MBH_Data *dat, struct Het *het, int typ, int k, int ll, doubl
     {
         // copy over new state if accepted
         logLx[q] = logLy;
-        for(i = 0; i < NP; i++) paramx[q][i] = paramy[q][i];
+        for(i = 0; i < NParams; i++) paramx[q][i] = paramy[q][i];
         if(nflag == 1) for(i = 0; i < dat->Nch; i++) sx[q][i] = sy[q][i];
         av[typ][k]++;
     }

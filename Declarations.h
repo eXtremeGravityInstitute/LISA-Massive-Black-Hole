@@ -8,6 +8,8 @@ struct MBH_Data
     double sqrtTobs;
     double Tstart;
     double Tend;
+    double fmin;
+    double fmax;
     double **SN;
     double **SM;
     double **data;

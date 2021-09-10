@@ -99,7 +99,7 @@
 
 #define GEOM 4.92569043916e-6
 
-#define NP 11
+#define NParams 11
 
 #define NI 6
 
@@ -121,9 +121,6 @@
 
 /* number of cold chains */
 #define NCC 4
-
-/* total number of chains */
-#define NC 24
 
 /* set to 1.0e-3 for v1, 0.0 for v2 */
 #define PDfref 0.0
