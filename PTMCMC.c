@@ -91,8 +91,8 @@ int main(int argc,char **argv)
   FILE* in;
   FILE* out;
     
-    params = (double*)malloc(sizeof(double)* (NP));
-    premove = (double*)malloc(sizeof(double)* (NP));
+    params = (double*)malloc(sizeof(double)* (NParams));
+    premove = (double*)malloc(sizeof(double)* (NParams));
     
     
     if(LDC == 1)  // LDC = 1 tells the code to analyze LDC data. Otherwise it does a noise-free run on the parameters provided
@@ -137,7 +137,7 @@ int main(int argc,char **argv)
     while ((j = fgetc(in)) != EOF)
     {
      fscanf(in,"%lf%lf", &x, &x);
-     for(i=0; i< NP; i++) fscanf(in,"%lf", &x);
+     for(i=0; i< NParams; i++) fscanf(in,"%lf", &x);
     NS++;
     }
     
@@ -149,13 +149,13 @@ int main(int argc,char **argv)
         if(k == rep)
         {
             fscanf(in,"%lf%lf", &x, &x);
-            for(i=0; i< NP; i++) fscanf(in,"%lf", &params[i]);
+            for(i=0; i< NParams; i++) fscanf(in,"%lf", &params[i]);
             //printf("%e\n", params[5]);
         }
         else // wind the file
         {
         fscanf(in,"%lf%lf", &x, &x);
-        for(i=0; i< NP; i++) fscanf(in,"%lf", &x);
+        for(i=0; i< NParams; i++) fscanf(in,"%lf", &x);
         }
     }
     fclose(in);
@@ -227,7 +227,7 @@ int main(int argc,char **argv)
     for(k=0; k < NS; k++)
     {
         fscanf(in,"%lf%lf", &x, &x);
-        for(i=0; i< NP; i++) fscanf(in,"%lf", &premove[i]);
+        for(i=0; i< NParams; i++) fscanf(in,"%lf", &premove[i]);
         
         if(k == rep)
         {
@@ -279,7 +279,7 @@ int main(int argc,char **argv)
            dat->data = double_matrix(dat->Nch,dat->N);
         
           in = fopen("source.dat","r");
-          for(i=0; i< NP; i++) fscanf(in,"%lf", &params[i]);
+          for(i=0; i< NParams; i++) fscanf(in,"%lf", &params[i]);
           fclose(in);
         
           // change to better intrinsic parameterization
@@ -324,14 +324,14 @@ int main(int argc,char **argv)
 
     
     double **paramx;
-    paramx = double_matrix(NC,NP);
+    paramx = double_matrix(NC,NParams);
     
     // here we copy the best fit source into all the chains
     // in the global fit the previous state for each chain
     // will instead be passed in
     for (i=0; i< NC; i++)
     {
-        for (j=0; j< NP; j++) paramx[i][j] = params[j];
+        for (j=0; j< NParams; j++) paramx[i][j] = params[j];
     }
     
     // set up the whos-who reference. In the global fit this will be passed
@@ -400,25 +400,25 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
     
     N = dat->N;
     
-    pmax = (double*)malloc(sizeof(double)* (NP));
+    pmax = (double*)malloc(sizeof(double)* (NParams));
     
     sacc = int_vector(NC);
     scount = int_vector(NC);
     heat = double_vector(NC);
     logLx = double_vector(NC);
-    paramy = double_matrix(NC,NP);
-    history = double_tensor(NC,NH,NP);
-    Fisher = double_tensor(NC,NP,NP);
-    ejump = double_matrix(NC,NP);
-    evec = double_tensor(NC,NP,NP);
+    paramy = double_matrix(NC,NParams);
+    history = double_tensor(NC,NH,NParams);
+    Fisher = double_tensor(NC,NParams,NParams);
+    ejump = double_matrix(NC,NParams);
+    evec = double_tensor(NC,NParams,NParams);
     
     // scale the PSDs
     sx = double_matrix(NC,dat->Nch);
     sy = double_matrix(NC,dat->Nch);
 
     // prior boundaries
-    max = (double*)malloc(sizeof(double)* (NP));
-    min = (double*)malloc(sizeof(double)* (NP));
+    max = (double*)malloc(sizeof(double)* (NParams));
+    min = (double*)malloc(sizeof(double)* (NParams));
     
     
     // ll = 0  [0] Mass1  [1] Mass2
@@ -490,7 +490,7 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
     {
         for (k=0; k< NH; k++)
         {
-            for (j=0; j< NP; j++) history[i][k][j] = paramx[i][j];
+            for (j=0; j< NParams; j++) history[i][k][j] = paramx[i][j];
         }
     }
     
@@ -502,7 +502,7 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
     
     //store max likelihood & parameters
     logLmax = logLx[who[0]];
-    for (j=0; j< NP; j++) pmax[j] = paramx[who[0]][j];
+    for (j=0; j< NParams; j++) pmax[j] = paramx[who[0]][j];
      
      // run NCC cold chains
      for (i=0; i< NCC; i++) heat[i] = 1.0;
@@ -518,7 +518,7 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
     for (i=0; i< NC; i++)
     {
     FisherHet(dat, het, ll, paramx[i], Fisher[i]);
-    FisherEvec(Fisher[i], ejump[i], evec[i], NP);
+    FisherEvec(Fisher[i], ejump[i], evec[i], NParams);
     efix(dat, het, 1, ll, paramx[i], min, max, ejump[i], evec[i], 1.0);
     }
 
@@ -595,7 +595,7 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
             for(k = 0; k < NC; k++)
             {
                 FisherHet(dat, het, ll, paramx[k], Fisher[k]);
-                FisherEvec(Fisher[k], ejump[k], evec[k], NP);
+                FisherEvec(Fisher[k], ejump[k], evec[k], NParams);
                 efix(dat, het, 1, ll, paramx[k], min, max, ejump[k], evec[k], 1.0);
             }
         }
@@ -629,7 +629,7 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
            
             for(j = 0; j < NC; j++)
             {
-                for(i = 0; i < NP; i++) paramy[j][i] = paramx[j][i];
+                for(i = 0; i < NParams; i++) paramy[j][i] = paramx[j][i];
                 if(nflag == 1) for(i = 0; i < dat->Nch; i++) sy[j][i] = sx[j][i];
             }
 
@@ -664,7 +664,7 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
              if(logLx[q] > logLmax)
              {
               logLmax = logLx[q];
-              for (j=0; j< NP; j++) pmax[j] = paramx[q][j];
+              for (j=0; j< NParams; j++) pmax[j] = paramx[q][j];
              }
             }
             
@@ -676,7 +676,7 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
                     q = who[k];
                     i = m[k]%NH;
                     // the history file is kept for each temperature
-                    for(j=0; j<NP; j++) history[k][i][j] = paramx[q][j];
+                    for(j=0; j<NParams; j++) history[k][i][j] = paramx[q][j];
                     m[k]++;
                 }
             }
@@ -701,69 +701,7 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
                     }
                 }*/
                 
-                for(k = 0; k < NCC; k++)
-                {
-                    q = who[k];
-                    
-                    if(ll == 0)
-                    {
-                    m1 = paramx[q][0];
-                    m2 = paramx[q][1];
-                    }
-                    
-                    if(ll == 1)
-                    {
-                    m1 = exp(paramx[q][0]);
-                    m2 = exp(paramx[q][1]);
-                    }
-                    
-                    if(ll == 2)
-                    {
-                    Mc = exp(paramx[q][0]);
-                    Mtot = exp(paramx[q][1]);
-                    eta = pow((Mc/Mtot), (5.0/3.0));
-                     if(eta > 0.25)
-                     {
-                        dm = 0.0;
-                     }
-                     else
-                     {
-                        dm = sqrt(1.0-4.0*eta);
-                     }
-                    m1 = Mtot*(1.0+dm)/2.0;
-                    m2 = Mtot*(1.0-dm)/2.0;
-                    }
-                    
-                    lisaskyloc(dat->Tend, paramx[q], &thetaL, &phiL);
-                
-                    DL = exp(paramx[q][6]);
-                    
-                     x = logLx[q];
-                    
-                    if(nflag == 1)  // only want to record the reduced log likelihood
-                    {
-                        for (i=0; i< dat->Nch; i++)
-                        {
-                        x += 0.5*het->DD[i]/sx[q][i];
-                        x += (double)(het->MM-het->MN)*log(sx[q][i]);
-                        }
-                    }
-                    
-                    fprintf(chain,"%d %.12e %.12e %.12e ", mc+k, x, m1, m2);
-                    for(i = 2; i < NP; i++)
-                     {
-                        if(i == 6)
-                         {
-                         fprintf(chain, "%.12e ", DL);
-                         }
-                         else
-                         {
-                          fprintf(chain, "%.15e ", paramx[q][i]);
-                         }
-                     }
-                    fprintf(chain,"%d %f %f %f %f\n", q, thetaL, phiL, sx[q][0], sx[q][1]);
-                }
-                
+                print_mbh_chain_file(dat, het, who, paramx, logLx, sx, ll, mc, chain);                
                 
                 fprintf(swaps, "%d ", mc);
                 for(k = 0; k < NC-1; k++)
@@ -787,6 +725,7 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
 
                 q = who[0];
                 
+                //get_component_masses(paramx[q], ll, &m1, &m2);
                 if(ll == 0)
                 {
                 m1 = paramx[q][0];
@@ -816,7 +755,7 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
                 m2 = Mtot*(1.0-dm)/2.0;
                 }
                 
-                
+
                if(nflag == 1)
                {
                     // only want to record the reduced log likelihood
@@ -866,9 +805,9 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
     free_double_vector(logLx);
     free_double_matrix(paramy,NC);
     free_double_tensor(history,NC,NH);
-    free_double_tensor(Fisher,NC,NP);
+    free_double_tensor(Fisher,NC,NParams);
     free_double_matrix(ejump,NC);
-    free_double_tensor(evec,NC,NP);
+    free_double_tensor(evec,NC,NParams);
     
     //###############################################
     //MT modification

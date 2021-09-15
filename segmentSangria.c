@@ -146,10 +146,20 @@ int main(int argc, char *argv[])
         
         //printf("%d %e\n", i, X);
         
+        /* Original TDI Conventions
         tdi->A[i] = (2.0*X-Y-Z)/3.0;
         tdi->E[i] = (Z-Y)/sqrt(3.0);
-        tdi->T[i] = (X+Y+Z)/3.0;
+        tdi->T[i] = (X+Y+Z)/3.0; */
         
+        /* LDC TDI Conventsion */
+        double invSQ2 = 0.707106781186547;
+        double invSQ6 = 0.408248290463863;
+        double invSQ3 = 0.577350269189626;
+
+        tdi->A[i] = (Z-X)*invSQ2;
+        tdi->E[i] = (X-2*Y+Z)*invSQ6;
+        tdi->T[i] = (X+Y+Z)*invSQ3;
+
     }
     
     

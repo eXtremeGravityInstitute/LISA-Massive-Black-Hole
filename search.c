@@ -4651,12 +4651,21 @@ void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, doubl
         fpz = -0.5*( (dplus[3][1]*cosps+dcross[3][1]*sinps)*TR[3][1] - (dplus[3][2]*cosps+dcross[3][2]*sinps)*TR[3][2] );
         fcz = -0.5*( (-dplus[3][1]*sinps+dcross[3][1]*cosps)*TR[3][1] - (-dplus[3][2]*sinps + dcross[3][2]*cosps)*TR[3][2] );
 
+        /* Original AET definition
         FpAR[n] = (2.0*fpx-fpy-fpz)/3.0;
         FcAR[n] = (2.0*fcx-fcy-fcz)/3.0;
         
         FpER[n] = (fpz-fpy)/sq3;
-        FcER[n] = (fcz-fcy)/sq3;
-                   
+        FcER[n] = (fcz-fcy)/sq3;*/
+        
+        
+        /* LDC's AET definition */
+        FpAR[n] = (fpz-fpx)*0.707106781186547;
+        FcAR[n] = (fcz-fcx)*0.707106781186547;
+        
+        FpER[n] = (fpx-2*fpy+fpz)*0.408248290463863;
+        FcER[n] = (fcx-2*fcy+fcz)*0.408248290463863;
+ 
         fpx = -0.5*( (dplus[1][2]*cosps+dcross[1][2]*sinps)*TI[1][2] - (dplus[1][3]*cosps+dcross[1][3]*sinps)*TI[1][3] );
         fcx = -0.5*( (-dplus[1][2]*sinps+dcross[1][2]*cosps)*TI[1][2] - (-dplus[1][3]*sinps + dcross[1][3]*cosps)*TI[1][3] );
                                          
@@ -4665,13 +4674,22 @@ void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, doubl
                                                                
         fpz = -0.5*( (dplus[3][1]*cosps+dcross[3][1]*sinps)*TI[3][1] - (dplus[3][2]*cosps+dcross[3][2]*sinps)*TI[3][2] );
         fcz = -0.5*( (-dplus[3][1]*sinps+dcross[3][1]*cosps)*TI[3][1] - (-dplus[3][2]*sinps + dcross[3][2]*cosps)*TI[3][2] );
-                                                                                     
+            
+        /* Original AET definition
         FpAI[n] = (2.0*fpx-fpy-fpz)/3.0;
         FcAI[n] = (2.0*fcx-fcy-fcz)/3.0;
                                                                                      
         FpEI[n] = (fpz-fpy)/sq3;
-        FcEI[n] = (fcz-fcy)/sq3;
+        FcEI[n] = (fcz-fcy)/sq3;*/
         
+        
+        /* LDC's AET definition */
+        FpAI[n] = (fpz-fpx)*0.707106781186547;
+        FcAI[n] = (fcz-fcx)*0.707106781186547;
+        
+        FpEI[n] = (fpx-2*fpy+fpz)*0.408248290463863;
+        FcEI[n] = (fcx-2*fcy+fcz)*0.408248290463863;
+
         
     }
     

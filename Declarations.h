@@ -117,4 +117,6 @@ double f_at_t(double m1, double m2, double chi1, double chi2, double tc, double 
 void de_jump(double *paramsx, double *paramsy, double **history, int m, int d, gsl_rng *r);
 double det(double **A, int N);
 double Tmerger(double *params, double t);
+void get_component_masses(double *params, int flag, double *m1, double *m2);
+void print_mbh_chain_file(struct MBH_Data *dat, struct Het *het, int *who, double **paramx, double *logLx, double **sx, int ll, int mc, FILE *chain);
 

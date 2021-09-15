@@ -529,7 +529,7 @@ void heterodyne(struct MBH_Data *dat, struct Het *het, int ll, double *params)
     
       for(id = 0; id < Nch; id++)
         {
-        for (i = 1; i < MM; ++i)
+        for (i = MN; i < MM; ++i)
         {
             hb[id][i] = ampb[id][i]*cos(phaseb[id][i]);
             hb[id][N-i] = ampb[id][i]*sin(phaseb[id][i]);
@@ -567,6 +567,7 @@ void heterodyne(struct MBH_Data *dat, struct Het *het, int ll, double *params)
     
     logL = 0.0;
     x = 0.0;
+    //TODO: check hb, rb, SN
     for(id = 0; id < Nch; id++)
     {
         HH = fourier_nwip2(hb[id], hb[id], dat->SN[id], MN, MM, N);
@@ -594,10 +595,9 @@ void heterodyne(struct MBH_Data *dat, struct Het *het, int ll, double *params)
          }
        }
 
-    
     for(id = 0; id < Nch; id++)
     {
-      for(j = 1; j < MM; j++)
+      for(j = MN; j < MM; j++)
       {
         cp = cos(phaseb[id][j]);
         sp = sin(phaseb[id][j]);
@@ -1195,207 +1195,6 @@ double Fstat_het(struct MBH_Data *dat, struct Het *het, int ll, double *params, 
     
 }
 
-double SNRFast(struct MBH_Data *dat, int ll, double *params)
-{
-    double *AAmp, *EAmp, *APhase, *EPhase;
-    double kxm;
-    int i, j, NF;
-    double SNR;
-    double *Aint, *Eint;
-
-    FILE *out;
-    
-    int NFmax = 100000;
- 
-    double *AF, *PF, *FF, *TF;
-    
-    //clock_t start, end;
-    //double cpu_time_used;
-    
-    FF = (double*)malloc(sizeof(double)* (NFmax));
-    
-    SetUp(dat, ll, params, NFmax, &NF, FF);
-                         
-    AF = (double*)malloc(sizeof(double)* (NF));
-    PF = (double*)malloc(sizeof(double)* (NF));
-    TF = (double*)malloc(sizeof(double)* (NF));
-    
-    Intrinsic(ll, params, dat->Tobs, NF, FF, TF, PF, AF);
-    
-    AAmp = (double*)malloc(sizeof(double)* (NF));
-    EAmp = (double*)malloc(sizeof(double)* (NF));
-    APhase = (double*)malloc(sizeof(double)* (NF));
-    EPhase = (double*)malloc(sizeof(double)* (NF));
-                         
-    Extrinsic(params, dat->Tstart, dat->Tend, NF, FF, TF, PF, AF, AAmp, EAmp, APhase, EPhase, &kxm);
-    
-    Aint = (double*)malloc(sizeof(double)* (NF));
-    Eint = (double*)malloc(sizeof(double)* (NF));
-    
-    out = fopen("intg.dat","w");
-    for (i=0; i< NF; i++)
-    {
-        j = (int)(FF[i]*dat->Tobs);
-        //printf("%d %d\n", i, j);
-        Aint[i] = 4.0*AAmp[i]*AAmp[i]/dat->SM[0][j];
-        Eint[i] = 4.0*EAmp[i]*EAmp[i]/dat->SM[1][j];
-        fprintf(out,"%e %e %e %e\n", TF[i], FF[i], Aint[i], Eint[i]);
-    }
-    fclose(out);
-     
-    
-    gsl_interp_accel *AAacc = gsl_interp_accel_alloc();
-    gsl_spline *AAspline = gsl_spline_alloc (gsl_interp_cspline, NF);
-    gsl_spline_init(AAspline, FF, AAmp, NF);
-    
-    gsl_interp_accel *AEacc = gsl_interp_accel_alloc();
-    gsl_spline *AEspline = gsl_spline_alloc (gsl_interp_cspline, NF);
-    gsl_spline_init(AEspline, FF, EAmp, NF);
-    
-    gsl_interp_accel *IAacc = gsl_interp_accel_alloc();
-    gsl_spline *IAspline = gsl_spline_alloc (gsl_interp_cspline, NF);
-    gsl_spline_init(IAspline, FF, Aint, NF);
-    
-    gsl_interp_accel *IEacc = gsl_interp_accel_alloc();
-    gsl_spline *IEspline = gsl_spline_alloc (gsl_interp_cspline, NF);
-    gsl_spline_init(IEspline, FF, Eint, NF);
-    
-    SNR = gsl_spline_eval_integ(IAspline, FF[0], FF[NF-1], IAacc)+gsl_spline_eval_integ(IEspline, FF[0], FF[NF-1], IEacc);
-    SNR *= dat->Tobs;
-    SNR = sqrt(SNR);
-    printf("SNR = %e SNRsq = %e\n", SNR, SNR*SNR);
-    
-    /*
-     
-     // This section is used to get SNR versus time
-    
-    SNRSQA = (double*)malloc(sizeof(double)* (NF));
-    SNRSQE = (double*)malloc(sizeof(double)* (NF));
-    
-    SNRSQA[0] = 0.0;
-    SNRSQE[0] = 0.0;
-    for (i=1; i< NF; i++)
-    {
-     SNRSQA[i] = SNRSQA[i-1]+gsl_spline_eval_integ(IAspline, FF[i-1], FF[i], IAacc);
-     SNRSQE[i] = SNRSQE[i-1]+gsl_spline_eval_integ(IEspline, FF[i-1], FF[i], IEacc);
-    }
-    
-    double SnrA, SnrE, SAT, SET, tmin, tmax;
-    
-    SnrA = SNRSQA[NF-1];
-    SnrE = SNRSQE[NF-1];
-    
-    SNR = sqrt(SnrA+SnrE);
-    
-    printf("SNR = %e SNRsq = %e\n", SNR, SNR*SNR);
-    
-    //printf("%f %f %e\n", SnrA, SnrE, SNRSQA[NF-1]+SNRSQE[NF-1]);
-
-    gsl_interp_accel *SAacc = gsl_interp_accel_alloc();
-    gsl_spline *SAspline = gsl_spline_alloc (gsl_interp_cspline, NF);
-    gsl_spline_init(SAspline, TF, SNRSQA, NF);
-    
-    gsl_interp_accel *SEacc = gsl_interp_accel_alloc();
-    gsl_spline *SEspline = gsl_spline_alloc (gsl_interp_cspline, NF);
-    gsl_spline_init(SEspline, TF, SNRSQE, NF);
-    
-    
-    NW = (int)(dat->Tobs/1000.0);
-    tmin = TF[0];
-    tmax = TF[NF-1];
-    out = fopen("SNRofT.dat","w");
-    
-    flag = 0;
-    
-    for (i=1; i< NW; i++)
-    {
-        t = tmin+(double)(i)*1000.0;
-        SAT = SnrA;  // make sure we get to the final value
-        SET = SnrE;
-        if(t < tmax)
-        {
-            SAT = gsl_spline_eval (SAspline, t, SAacc);
-            SET = gsl_spline_eval (SEspline, t, SEacc);
-        }
-        
-        x = sqrt(SAT+SET);
-        
-        if(x > 10.0 && flag == 0)
-        {
-            flag = 1;
-            y = t;
-        }
-        
-        fprintf(out,"%e %e %e %e\n", t, x, sqrt(SAT), sqrt(SET));
-    }
-    fclose(out);
-    
-    t10 = y;
-    
-    if(flag == 1)
-    {
-    // refine estimate of when SNR = 10 is reached
-    
-    flag = 0;
-    
-    for (i=-1000; i< 1000; i++)
-    {
-        t = y+(double)(i);
-        
-        SAT = SnrA;  // make sure we get to the final value
-        SET = SnrE;
-        if(t < tmax)
-        {
-            SAT = gsl_spline_eval (SAspline, t, SAacc);
-            SET = gsl_spline_eval (SEspline, t, SEacc);
-        }
-        
-        x = sqrt(SAT+SET);
-        
-        if(x > 10.0 && flag == 0)
-        {
-            flag = 1;
-            t10 = t;
-        }
-        
-    }
- 
-    
-    printf("SNR=10 at t = %e, tc-t = %e\n", t10, params[5]-t10);
-     
-    }
-    
-    
-    free(SNRSQA);
-    free(SNRSQE);
-     
-     */
-     
-     
-    free(Aint);
-    free(Eint);
-    free(AAmp);
-    free(EAmp);
-    free(APhase);
-    free(EPhase);
-    free(FF);
-    free(TF);
-    free(AF);
-    free(PF);
-    
-    gsl_spline_free(IAspline);
-    gsl_spline_free(IEspline);
-    gsl_spline_free(AAspline);
-    gsl_spline_free(AEspline);
-    gsl_interp_accel_free(IAacc);
-    gsl_interp_accel_free(IEacc);
-    gsl_interp_accel_free(AAacc);
-    gsl_interp_accel_free(AEacc);
-    
-    return(SNR);
-    
-}
-
 void Extrinsic(double *params, double Tstart, double Tend, int NF, double *FF, double *TF, double *PF, double *AF, double *AAmp, double *EAmp, double *APhase, double *EPhase, double *kxm)
 {
     
@@ -1550,7 +1349,7 @@ void Extrinsic(double *params, double Tstart, double Tend, int NF, double *FF, d
 void SetUp(struct MBH_Data *dat, int ll, double *params, int NFmax, int *NFS, double *FF)
 {
     double fr, df, DT, fac, f, fmax, fmin;
-    double m1, m2,Mtot, Mc, eta, dm;
+    double m1, m2,Mtot, Mc, eta;
     double distance, tc;
     int i, NF;
     double dfmin, dfmax;
@@ -1561,6 +1360,14 @@ void SetUp(struct MBH_Data *dat, int ll, double *params, int NFmax, int *NFS, do
     
     // NFmax is the size of the holder arrays. NFS is the actual size.
     
+//    distance = params[6]*1.0e9*PC_SI; // distance
+//    get_component_masses(params, ll, &m1, &m2);
+//    m1*=Tsun;
+//    m2*=Tsun;
+//    Mtot = (m1+m2);
+//    eta = m1*m2/((m1+m2)*(m1+m2));
+//    Mc = pow(m1*m2,3.0/5.0)/pow(m1+m2,1.0/5.0);
+    double dm;
     if(ll == 0)  // linear in m1, m2
     {
     m1 = params[0]*Tsun;    // Mass1
@@ -3160,7 +2967,7 @@ void ResponseFreq(struct MBH_Data *dat, int ll, double *params, double *AS, doub
         
     double HC, HS, Tobs;
     
-    double m1, m2, chi1, chi2, phic, tc, distance, Mtot, eta, dm, fr;
+    double m1, m2, chi1, chi2, phic, tc, distance, Mtot, eta, fr;
     
     double *ta, *xia, *FF;
     
@@ -3197,7 +3004,14 @@ void ResponseFreq(struct MBH_Data *dat, int ll, double *params, double *AS, doub
    // printf("%e %e %e\n", fstart, fstop, fr);
 
     
-    
+//    distance = params[6]*1.0e9*PC_SI; // distance
+//    get_component_masses(params, ll, &m1, &m2);
+//    m1*=Tsun;
+//    m2*=Tsun;
+//    Mtot = (m1+m2);
+//    eta = m1*m2/((m1+m2)*(m1+m2));
+//    Mc = pow(m1*m2,3.0/5.0)/pow(m1+m2,1.0/5.0);
+    double dm;
     if(ll == 0)  // linear in m1, m2
     {
     m1 = params[0]*Tsun;    // Mass1
@@ -3644,7 +3458,7 @@ void Intrinsic(int ll, double *params, double Tobs, int NF, double *FF, double *
     
     double m1, m2, chi1, chi2, Mtot, Mc;
     double m1_SI, m2_SI, distance, tc;
-    double eta, dm, fx;
+    double eta, fx;
     
     double af, fr, dtdf, sqrtTobs;
     
@@ -3655,6 +3469,14 @@ void Intrinsic(int ll, double *params, double Tobs, int NF, double *FF, double *
 
     double fRef_in;
     
+//    distance = params[6]*1.0e9*PC_SI; // distance
+//    get_component_masses(params, ll, &m1, &m2);
+//    m1*=Tsun;
+//    m2*=Tsun;
+//    Mtot = (m1+m2);
+//    eta = m1*m2/((m1+m2)*(m1+m2));
+//    Mc = pow(m1*m2,3.0/5.0)/pow(m1+m2,1.0/5.0);
+    double dm;
     if(ll == 0)  // linear in m1, m2
     {
     m1 = params[0]*Tsun;    // Mass1
@@ -4045,13 +3867,21 @@ double f_at_t(double m1, double m2, double chi1, double chi2, double tc, double 
 double FofT(int ll, double Tobs, double *params, double *frg, double dt, double tref)
 {
     
-    double m1, m2, m1_SI, m2_SI, chi1, chi2, tc, dm;
+    double m1, m2, m1_SI, m2_SI, chi1, chi2, tc;
     double Mtot, eta, Mc, af, fr;
     double Amp, Phase, distance;
     double fref;
     double fnew, tf;
     int i;
     
+//    distance = params[6]*1.0e9*PC_SI; // distance
+//    get_component_masses(params, ll, &m1, &m2);
+//    m1*=Tsun;
+//    m2*=Tsun;
+//    Mtot = (m1+m2);
+//    eta = m1*m2/((m1+m2)*(m1+m2));
+//    Mc = pow(m1*m2,3.0/5.0)/pow(m1+m2,1.0/5.0);
+    double dm;
     if(ll == 0)  // linear in m1, m2
     {
     m1 = params[0]*Tsun;    // Mass1
@@ -4430,12 +4260,21 @@ void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, doubl
         fpz = -0.5*( (dplus[3][1]*cosps+dcross[3][1]*sinps)*TR[3][1] - (dplus[3][2]*cosps+dcross[3][2]*sinps)*TR[3][2] );
         fcz = -0.5*( (-dplus[3][1]*sinps+dcross[3][1]*cosps)*TR[3][1] - (-dplus[3][2]*sinps + dcross[3][2]*cosps)*TR[3][2] );
 
+        /* Original AET definition
         FpAR[n] = (2.0*fpx-fpy-fpz)/3.0;
         FcAR[n] = (2.0*fcx-fcy-fcz)/3.0;
         
         FpER[n] = (fpz-fpy)/sq3;
-        FcER[n] = (fcz-fcy)/sq3;
-                   
+        FcER[n] = (fcz-fcy)/sq3;*/
+        
+        
+        /* LDC's AET definition */
+        FpAR[n] = (fpz-fpx)*0.707106781186547;
+        FcAR[n] = (fcz-fcx)*0.707106781186547;
+        
+        FpER[n] = (fpx-2*fpy+fpz)*0.408248290463863;
+        FcER[n] = (fcx-2*fcy+fcz)*0.408248290463863;
+        
         fpx = -0.5*( (dplus[1][2]*cosps+dcross[1][2]*sinps)*TI[1][2] - (dplus[1][3]*cosps+dcross[1][3]*sinps)*TI[1][3] );
         fcx = -0.5*( (-dplus[1][2]*sinps+dcross[1][2]*cosps)*TI[1][2] - (-dplus[1][3]*sinps + dcross[1][3]*cosps)*TI[1][3] );
                                          
@@ -4444,13 +4283,21 @@ void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, doubl
                                                                
         fpz = -0.5*( (dplus[3][1]*cosps+dcross[3][1]*sinps)*TI[3][1] - (dplus[3][2]*cosps+dcross[3][2]*sinps)*TI[3][2] );
         fcz = -0.5*( (-dplus[3][1]*sinps+dcross[3][1]*cosps)*TI[3][1] - (-dplus[3][2]*sinps + dcross[3][2]*cosps)*TI[3][2] );
-                                                                                     
+
+        /* Original AET definition
         FpAI[n] = (2.0*fpx-fpy-fpz)/3.0;
         FcAI[n] = (2.0*fcx-fcy-fcz)/3.0;
                                                                                      
         FpEI[n] = (fpz-fpy)/sq3;
-        FcEI[n] = (fcz-fcy)/sq3;
+        FcEI[n] = (fcz-fcy)/sq3;*/
         
+        
+        /* LDC's AET definition */
+        FpAI[n] = (fpz-fpx)*0.707106781186547;
+        FcAI[n] = (fcz-fcx)*0.707106781186547;
+        
+        FpEI[n] = (fpx-2*fpy+fpz)*0.408248290463863;
+        FcEI[n] = (fcx-2*fcy+fcz)*0.408248290463863;
         
     }
 

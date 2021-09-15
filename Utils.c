@@ -977,3 +977,80 @@ double det(double **A, int N)
     
     
 }
+
+void get_component_masses(double *params, int flag, double *m1, double *m2)
+{
+    double Mc, Mtot, eta, dm;
+    switch(flag)
+    {
+        case 0:
+            *m1 = params[0];
+            *m2 = params[1];
+            break;
+        case 1:
+            *m1 = exp(params[0]);
+            *m2 = exp(params[1]);
+            break;
+        case 2:
+            Mc = exp(params[0]);
+            Mtot = exp(params[1]);
+            eta = pow(Mc/Mtot, 5./3.);
+            dm = 0.0;
+            if(eta < 0.25) dm = sqrt(1. - 4.*eta);
+            *m1 = 0.5*Mtot*(1.+dm);
+            *m2 = 0.5*Mtot*(1.-dm);
+            break;
+        default:
+            break;
+    }
+}
+
+void print_mbh_chain_file(struct MBH_Data *dat, struct Het *het, int *who, double **paramx, double *logLx, double **sx, int ll, int mc, FILE *chain)
+{
+    int i;
+    int k;
+    int q;
+    double m1;
+    double m2;
+    double thetaL;
+    double phiL;
+    double DL;
+    double x;
+    
+    for(k = 0; k < NCC; k++)
+    {
+        q = who[k];
+        
+        get_component_masses(paramx[q], ll, &m1, &m2);
+        
+        lisaskyloc(dat->Tend, paramx[q], &thetaL, &phiL);
+        
+        DL = exp(paramx[q][6]);
+        
+        x = logLx[q];
+        
+        if(nflag == 1)  // only want to record the reduced log likelihood
+        {
+            for (i=0; i< dat->Nch; i++)
+            {
+                x += 0.5*het->DD[i]/sx[q][i];
+                x += (double)(het->MM-het->MN)*log(sx[q][i]);
+            }
+        }
+        
+        fprintf(chain,"%d %.12e %.12e %.12e ", mc+k, x, m1, m2);
+        for(i = 2; i < NParams; i++)
+        {
+            if(i == 6)
+            {
+                fprintf(chain, "%.12e ", DL);
+            }
+            else
+            {
+                fprintf(chain, "%.15e ", paramx[q][i]);
+            }
+        }
+        fprintf(chain,"%d %f %f %f %f\n", q, thetaL, phiL, sx[q][0], sx[q][1]);
+    }
+}
+
