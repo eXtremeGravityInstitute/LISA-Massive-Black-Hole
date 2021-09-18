@@ -62,3 +62,21 @@ Using the full data set results in a longer set-up time (data read etc), but onc
 
 The PTMCMC outputs a single chain file, "chain.dat". [TODO - name the chain file by the source number and segment label]
 
+## Build MBH library
+To build library of MBH functions compile with `cmake` via
+
+`./install.sh /path/to/destination/`
+
+The install script will create in the destination directory 
+
+```bash
+.
+├── include
+│   ├── Constants.h
+│   ├── Declarations.h
+│   ├── IMRPhenomD.h
+│   ├── IMRPhenomD_internals.h
+│   └── mbh.h
+└── lib
+    └── libmbh.a
+```
