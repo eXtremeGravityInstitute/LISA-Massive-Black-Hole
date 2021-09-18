@@ -1,11 +1,11 @@
-/****************************************************************************/
+/* ************************************************************************ */
 /*                                                                          */
 /* TITLE: Preprocessor Macros For The Galactic Background                   */
 /*                                                                          */
 /* ABSTRACT: This header file contains a number of constants used           */
 /* throughout the making of the galactic backgound realizations.            */
 /*                                                                          */
-/****************************************************************************/
+/* ************************************************************************ */
 
 
 
