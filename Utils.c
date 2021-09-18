@@ -431,3 +431,61 @@ void print_mbh_chain_file(struct MBH_Data *dat, struct Het *het, int *who, doubl
     }
 }
 
+void set_mbh_priors(struct MBH_Data *dat, int massFlag, double *min, double *max)
+{
+    // ll = 0  [0] Mass1  [1] Mass2
+    // ll = 1  [0] ln Mass1  [1] ln Mass2
+    // ll = 2  [0] ln Mc  [1] ln Mtot
+    // [2] Spin1 [3] Spin2 [4] phic [5] tc [6] ln distance
+    // [7] cos EclipticCoLatitude, [8] EclipticLongitude  [9] polarization, [10] cos inclination
+
+    switch (massFlag)
+    {
+        case 0:
+            max[0] = 5.0e8;
+            max[1] = 5.0e8;
+            min[0] = 1.0e3;
+            min[1] = 1.0e3;
+            break;
+        case 1:
+            max[0] = log(5.0e8);
+            max[1] = log(5.0e8);
+            min[0] = log(1.0e3);
+            min[1] = log(1.0e3);
+            break;
+        case 2:
+            max[0] = log(0.44*5.0e8);
+            max[1] = log(5.0e8);
+            min[0] = log(1.0e2);
+            min[1] = log(1.0e3);
+            break;
+        default:
+            fprintf(stderr,"massFlag must be [0,1,2]\n");
+            exit(1);
+            break;
+    }
+    
+    
+    
+    max[2] = 0.999;
+    max[3] = 0.999;
+    max[4] = PI;
+    max[5] = 2.0*dat->Tend;
+    max[6] = log(1.0e3);
+    max[7] = 1.0;
+    max[8] = 2.0*PI;
+    max[9] = PI;
+    max[10] = 1.0;
+    
+    
+    min[2] = -0.999;
+    min[3] = -0.999;
+    min[4] = 0.0;
+    min[5] = 1.01*dat->Tstart;
+    min[6] = log(0.1);
+    min[7] = -1.0;
+    min[8] = 0.0;
+    min[9] = 0.0;
+    min[10] = -1.0;
+}
+

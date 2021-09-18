@@ -95,4 +95,5 @@ double det(double **A, int N);
 double Tmerger(double *params, double t);
 void get_component_masses(double *params, int flag, double *m1, double *m2);
 void print_mbh_chain_file(struct MBH_Data *dat, struct Het *het, int *who, double **paramx, double *logLx, double **sx, int ll, int mc, FILE *chain);
+void set_mbh_priors(struct MBH_Data *dat, int massFlag, double *min, double *max);
 
