@@ -46,11 +46,10 @@ struct Het
 
 void freehet(struct Het *het);
 void lisaskyloc(double t, double *params, double *thetaL, double *phiL);
-void SetUp(struct MBH_Data *dat, int ll, double *params, int NFmax, int *NFS, double *FF);
+void SetUp(struct MBH_Data *dat, int ll, double *params, int *NFS, double *FF);
 void StartStop(int ll, double *params, double Tstart, double Tend, double dt, double *fstart, double *fstop, double *frg);
 void Intrinsic(int ll, double *params, double Tobs, int NF, double *FF, double *TF, double *PF, double *AF);
 void ResponseFast(struct MBH_Data *dat, int ll, double *params, double *AS, double *ES);
-double Likelihood_check(struct MBH_Data *dat, struct Het *het, int ll, double *params);
 void ResponseFreq(struct MBH_Data *dat, int ll, double *params, double *AS, double *ES);
 double chisq(struct MBH_Data *dat, int ll, double *params, double *AR, double *ER);
 double chisq_het(struct MBH_Data *dat, struct Het *het, int ll, double *params, double **ampR, double **phaseR);
@@ -63,16 +62,7 @@ double SNRstart(struct MBH_Data *dat, int ll, double *params);
 void FisherHet(struct MBH_Data *dat, struct Het *het, int ll, double *params, double **Fisher);
 void FisherSubHet(struct MBH_Data *dat, struct Het *het, int ll, int *pmap, double *params, double **Fisher);
 
-void FisherPlot(struct MBH_Data *dat, int ll, double *params);
-void pbt_shift(double *corr, double *corrf, double *data1, double *data2, double *Sn, int n);
-double log_likelihood_max_dual(struct MBH_Data *dat, int ll, double *params);
-void InChl(int ll, double *params, double **Fisher, double **iChl);
-void Ext_In(int ll, double *params, double **Fisher, double **eChl, double **iChl);
 void map_params(int ll, double *params);
-double tvol(double *params);
-void cholesky(double **A, double **C, int N);
-void ang2pix_ring( const long nside, double theta, double phi, long *ipix);
-void pix2ang_ring( long nside, long ipix, double *theta, double *phi);
 int *int_vector(int N);
 void free_int_vector(int *v);
 double **double_matrix(int N, int M);
@@ -88,8 +78,6 @@ void Inverse(double **M, double **IM, int d);
 void spacecraft(double t,  double *x, double *y, double *z);
 void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, double *FpAR, double *FpAI, double *FcAR, double *FcAI,
                double *FpER, double *FpEI, double *FcER, double *FcEI);
-void RAfilters(double *params, int NF, double *TF, double *FF, double *xi, double *FpAR, double *FpAI, double *FcAR, double *FcAI,
-               double *FpER, double *FpEI, double *FcER, double *FcEI);
 void timearray(double *params, RealVector *freq, long N, double *TF, AmpPhaseFDWaveform *ap);
 double FofT(int ll, double Tobs, double *params, double *frg, double dt, double tref);
 void Extrinsic(double *params, double Tstart, double Tend, int NF, double *FF, double *TF, double *PF, double *AF, double *AAmp, double *EAmp, double *APhase, double *EPhase, double *kxm);
@@ -98,22 +86,10 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
 void instrument_noise(double f, double *SAE);
 void getfreq(double Tend, double *fnew, double *tf, double *Amp, double *Phase, double t, double fguess, double phic, double fRef_in, double m1_SI, double m2_SI, double chi1, double chi2, double distance, double tc);
 void update(struct MBH_Data *dat, struct Het *het, int typ, int k, int ll, double *logLx, double **paramx, double **paramy, double **sx, double **sy, double *min, double *max, int *who, double *heat, double ***history, int NH, double **ejump, double ***evec, int **cv, int **av, gsl_rng *r);
-double LikelihoodDeltaMaxT(struct MBH_Data *dat, int ll, double *params, int NF, double *FF, double *AA, double *EA, double *AP, double *EP);
-double LikelihoodDeltaMax(struct MBH_Data *dat, int ll, double *params, int NF, double *FF, double *AA, double *EA, double *AP, double *EP);
-double LikelihoodDelta(struct MBH_Data *dat, int ll, double *params, int NF, double *FF, double *AA, double *EA, double *AP, double *EP);
-double LikelihoodFstat(struct MBH_Data *dat, int ll, double *params, double tm, int NF, double *FF, double *AA, double *EA, double *AP, double *EP);
 void FisherEvec(double **fish, double *ej, double **ev, int d);
-void FisherEvecSVD(double **fish, double *ej, double **ev, int d);
-void FisherEvecSplit(double **fish, double *ej, double **ev, int d);
 double fourier_nwip2(double *a, double *b, double *Sn, int imin, int imax, int N);
-void fourier_nwip_time(double *abt, double *a, double *b, double *Sn, double Tobs, int n);
-void fourier_nwip_dual_time(double *abt, double *aA, double *bA, double *aE, double *bE, double *Sn, double Tobs, int n);
-void FstatRA(struct MBH_Data *dat, int ll, double *params, double *pnew, int NF, double *FF, double *TF, double *PF, double *AF, double *AAmp, double *EAmp, double *APhase, double *EPhase);
-void FisherDirectShift(struct MBH_Data *dat, int ll, double *params, double **Fisher);
 void FisherSub(struct MBH_Data *dat, int ll, int *pmap, double *params, double **Fisher);
 void FisherFast(struct MBH_Data *dat, int ll, double *params, double **Fisher);
-double f_start(double m1, double m2, double chi1, double chi2, double tc);
-double f_at_t(double m1, double m2, double chi1, double chi2, double tc, double dt, double t);
 void de_jump(double *paramsx, double *paramsy, double **history, int m, int d, gsl_rng *r);
 double det(double **A, int N);
 double Tmerger(double *params, double t);

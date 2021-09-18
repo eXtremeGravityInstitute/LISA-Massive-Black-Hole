@@ -1,5 +1,3 @@
-void ang2pix_ring( const long nside, double theta, double phi, long *ipix);
-void pix2ang_ring( long nside, long ipix, double *theta, double *phi);
 double Tmap(double *params, double tdet);
 void searchsky(double *pmax, double **paramx, double *AC, double *EC, double *SAS, double *SES, double *SA, double *SE, double Tobs, int seg, int N, int rep);
 void updatesky(int mc, int k, int ll, double *logLx, double **paramx, double **eval, double ***evec, double *min, double *max, int *who, double *heat, int **av, int **cv, double *AC, double *EC, double *SA, double *SE, double Tobs, double Tzero, int N, gsl_rng *r);

@@ -44,7 +44,7 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
        
     FF = (double*)malloc(sizeof(double)* (NFmax));
        
-    SetUp(dat, ll, params, NFmax, &NF, FF);
+    SetUp(dat, ll, params, &NF, FF);
     
     x = SNRstart(dat, ll, params);
     
@@ -1346,7 +1346,7 @@ void Extrinsic(double *params, double Tstart, double Tend, int NF, double *FF, d
 }
 
 
-void SetUp(struct MBH_Data *dat, int ll, double *params, int NFmax, int *NFS, double *FF)
+void SetUp(struct MBH_Data *dat, int ll, double *params, int *NFS, double *FF)
 {
     double fr, df, DT, fac, f, fmax, fmin;
     double m1, m2,Mtot, Mc, eta;
@@ -1521,7 +1521,7 @@ void FisherFast(struct MBH_Data *dat, int ll, double *params, double **Fisher)
     
     FF = (double*)malloc(sizeof(double)* (NFmax));
     
-    SetUp(dat, ll, params, NFmax, &NF, FF);
+    SetUp(dat, ll, params, &NF, FF);
     
     AF = (double*)malloc(sizeof(double)* (NF));
     PF = (double*)malloc(sizeof(double)* (NF));
@@ -2223,7 +2223,7 @@ void FisherSub(struct MBH_Data *dat, int ll, int *pmap, double *params, double *
     
     FF = (double*)malloc(sizeof(double)* (NFmax));
     
-    SetUp(dat, ll, params, NFmax, &NF, FF);
+    SetUp(dat, ll, params, &NF, FF);
     
     AF = (double*)malloc(sizeof(double)* (NF));
     PF = (double*)malloc(sizeof(double)* (NF));
@@ -2879,35 +2879,6 @@ void instrument_noise(double f, double *SAE)
     
 }
 
-double Likelihood_check(struct MBH_Data *dat, struct Het *het, int ll, double *params)
-{
-    double *AS, *ES;
-    double HH, HD;
-    double logL;
-    int imax, imin;
-    
-    imin = het->MN;
-    imax = het->MM;
-    
-    AS = (double*)malloc(sizeof(double)* (dat->N));
-    ES = (double*)malloc(sizeof(double)* (dat->N));
-    
-    ResponseFast(dat, ll, params, AS, ES);
-    
-    HH = (fourier_nwip2(AS, AS, dat->SN[0], imin, imax, dat->N)+fourier_nwip2(ES, ES, dat->SN[1], imin, imax, dat->N));
-    HD = (fourier_nwip2(AS, dat->data[0], dat->SN[0], imin, imax, dat->N)+fourier_nwip2(ES, dat->data[1], dat->SN[1], imin, imax, dat->N));
-    
-    logL = HD-0.5*HH;
-    
-   //printf("%e %e %e\n", logL, HH, HD);
-    
-    free(AS);
-    free(ES);
-    
-    return(logL);
-    
-}
-
 double SNRstart(struct MBH_Data *dat, int ll, double *params)
 {
     double *AS, *ES;
@@ -3227,7 +3198,7 @@ void ResponseFast(struct MBH_Data *dat, int ll, double *params, double *AS, doub
         
     FF = (double*)malloc(sizeof(double)* (NFmax));
     
-    SetUp(dat, ll, params, NFmax, &NF, FF);
+    SetUp(dat, ll, params, &NF, FF);
     
     AF = (double*)malloc(sizeof(double)* (NF));
     PF = (double*)malloc(sizeof(double)* (NF));

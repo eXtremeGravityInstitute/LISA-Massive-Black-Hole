@@ -215,6 +215,9 @@ int main(int argc, char *argv[])
     
     fac = sqrt(Tseg)/(double)(Nseg);   // Fourier scaling
     
+    double tscale,tscale2;
+    tukey_scale(&tscale,&tscale2,alpha, Nseg);
+    
    for (j = 0; j < segs; ++j)
    {
        
@@ -225,7 +228,10 @@ int main(int argc, char *argv[])
        E[i] = tdi->E[k];
        T[i] = tdi->T[k];
       }
-       
+       tukey(A, alpha, Nseg);
+       tukey(E, alpha, Nseg);
+       tukey(T, alpha, Nseg);
+
        sprintf(command, "AET_seg%d_t.dat", j);
        out = fopen(command,"w");
        for(i=0; i< Nseg; i++)
@@ -236,9 +242,6 @@ int main(int argc, char *argv[])
        }
        fclose(out);
        
-          tukey(A, alpha, Nseg);
-          tukey(E, alpha, Nseg);
-          tukey(T, alpha, Nseg);
        
           gsl_fft_real_radix2_transform(A, 1, Nseg);
           gsl_fft_real_radix2_transform(E, 1, Nseg);
@@ -246,9 +249,9 @@ int main(int argc, char *argv[])
        
        for(i=0; i< Nseg; i++)
        {
-           A[i] *= fac;
-           E[i] *= fac;
-           T[i] *= fac;
+           A[i] *= fac/tscale;
+           E[i] *= fac/tscale;
+           T[i] *= fac/tscale;
        }
        
        sprintf(command, "AET_seg%d_f.dat", j);
@@ -260,7 +263,17 @@ int main(int argc, char *argv[])
            fprintf(out,"%e %.12e %.12e %.12e\n", f, A[i], E[i], T[i]);
        }
        fclose(out);
-       
+
+       sprintf(command, "AET_seg%d_f_NR.dat", j);
+       out = fopen(command,"w");
+       for(i=1; i< Nseg/2; i++)
+       {
+           f = (double)(i)/Tseg;
+
+           fprintf(out,"%e %.12e %.12e %.12e %.12e\n", f, A[i], A[Nseg-i], E[i], E[Nseg-i]);
+       }
+       fclose(out);
+
    }
     
    
@@ -431,22 +444,19 @@ double cosw(double t, double Tint)
 
 void tukey(double *data, double alpha, int N)
 {
-  int i, imin, imax;
-  double filter;
-  
-  imin = (int)(alpha*(double)(N-1)/2.0);
-  imax = (int)((double)(N-1)*(1.0-alpha/2.0));
-  
-    int Nwin = N-imax;
-
+    int i, imin, imax;
+    double filter;
+    
+    imin = (int)(alpha*(double)(N-1)/2.0);
+    imax = (int)((double)(N-1)*(1.0-alpha/2.0));
+    
     for(i=0; i< N; i++)
-  {
-    filter = 1.0;
-    if(i<imin) filter = 0.5*(1.0+cos(M_PI*( (double)(i)/(double)(imin)-1.0 )));
-    if(i>imax) filter = 0.5*(1.0+cos(M_PI*( (double)(i-imax)/(double)(Nwin))));
-    data[i] *= filter;
-  }
-  
+    {
+        filter = 1.0;
+        if(i < imin) filter = 0.5*(1.0+cos(M_PI*( (double)(i)/(double)(imin)-1.0 )));
+        if(i>imax)   filter = 0.5*(1.0+cos(M_PI*( (double)(N-1-i)/(double)(imin)-1.0)));
+        data[i] *= filter;
+    }
 }
 
 
