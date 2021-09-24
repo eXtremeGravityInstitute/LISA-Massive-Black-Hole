@@ -1,13 +1,17 @@
 void ang2pix_ring( const long nside, double theta, double phi, long *ipix);
 void pix2ang_ring( long nside, long ipix, double *theta, double *phi);
 double Tmap(double *params, double tdet);
+double findsky(int ll, double *params, double *min, double *max, double Tobs, double Tzero, int N,  double *AC, double *EC, double *SA, double *SE, gsl_rng *r);
 void searchsky(double *pmax, double **paramx, double *AC, double *EC, double *SAS, double *SES, double *SA, double *SE, double Tobs, int seg, int N, int rep);
 void updatesky(int mc, int k, int ll, double *logLx, double **paramx, double **eval, double ***evec, double *min, double *max, int *who, double *heat, int **av, int **cv, double *AC, double *EC, double *SA, double *SE, double Tobs, double Tzero, int N, gsl_rng *r);
 void spacecraft(double t, double *x, double *y, double *z);
 void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, double *FpAR, double *FpAI, double *FcAR, double *FcAI, double *FpER, double *FpEI, double *FcER, double *FcEI);
+void ResponseFstat(int ll, double *params, long N, double **AS, double **ES, double Tobs, double Tzero);
+void RAFstat(double *params, int NF, double *TF, double *FF, double *xi, double *FpAR, double *FpAI, double *FcAR, double *FcAI, double *FpER, double *FpEI, double *FcER, double *FcEI);
 void timearray(double *params, RealVector *freq, long N, double *TF, AmpPhaseFDWaveform *ap);
 double Likelihood(int ll, double *params, long N, double *AD, double *ED, double *SA, double *SE, double Tobs, double Tzero);
 double likelihoodFstat(int ll, double *params, int N, double *AC, double *EC, double *SA, double *SE, double Tobs, double Tzero);
+double likelihoodFstatOld(int ll, double *params, int N, double *AC, double *EC, double *SA, double *SE, double Tobs, double Tzero);
 double likelihoodFstatTmax(int ll, double *params, int N, double *AC, double *EC, double *SA, double *SE, double Tobs, double Tzero);
 void ResponseFreq(int ll, double *params, long N, double *AS, double *ES, double Tobs, double Tzero);
 void cholesky(double **A, double **C, int N);

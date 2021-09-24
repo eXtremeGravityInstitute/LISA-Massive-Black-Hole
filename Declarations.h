@@ -58,6 +58,8 @@ double chisq_het(struct Data *dat, struct Het *het, int ll, double *params, doub
 void heterodyne(struct Data *dat, struct Het *het, int ll, double *params);
 void legendre_maker(int J, int U, double **P);
 void fullphaseamp(struct Data *dat, int ll, int K, double *params, double *freq, double *Aamp, *Eamp, *Aphase, *Ephase);
+void Antenna(double *params, double Tstart, double Tend, int NF, double *FF, double *TF, double *AAmp, double *EAmp, double *APhase, double *EPhase);
+void antennaphaseamp(struct Data *dat, int ll, double *params);
 double log_likelihood_het(struct Data *dat, struct Het *het, int ll, double *params, double *sx);
 double Fstat_het(struct Data *dat, struct Het *het, int ll, double *params, double *sx, double tm);
 double SNRstart(struct Data *dat, int ll, double *params);
