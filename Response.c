@@ -427,7 +427,7 @@ void fullphaseamp(struct Data *dat, int ll, int K, double *params, double *freq,
     tc = params[5];    // merger time
     for(i=0; i< K; i++)
     {
-        PF[i] -= TPI*freq[i]*(dat->Tobs-tc + dat->dt/2.0)-2.0*phic;
+        PF[i] -= TPI*freq[i]*(dat->Tend-tc + dat->dt/2.0)-2.0*phic;
     }
     
     Extrinsic(params, dat->Tstart, dat->Tend, K, freq, TF, PF, AF, Aamp, Eamp, Aphase, Ephase, &kxm);
@@ -437,6 +437,183 @@ void fullphaseamp(struct Data *dat, int ll, int K, double *params, double *freq,
     free(AF);
     
 }
+
+void antennaphaseamp(struct Data *dat, int ll, double *params)
+{
+    // antenna pattern modulation of the amplitude and phase
+    
+    int i, K;
+    double fmax, fr;
+    double *TF, *PF, *AF;
+    double *FF, *Aamp, *Eamp, *Aphase, *Ephase;
+    FILE *out;
+    
+    fmax = FofT(ll, dat->Tend, params, &fr, dat->dt, dat->Tend);
+    
+    K = (int)(fmax*dat->Tobs);
+    
+    FF = (double*)malloc(sizeof(double)* (K));
+    TF = (double*)malloc(sizeof(double)* (K));
+    PF = (double*)malloc(sizeof(double)* (K));
+    AF = (double*)malloc(sizeof(double)* (K));
+    
+    Aamp = (double*)malloc(sizeof(double)* (K));
+    Eamp = (double*)malloc(sizeof(double)* (K));
+    Aphase = (double*)malloc(sizeof(double)* (K));
+    Ephase = (double*)malloc(sizeof(double)* (K));
+    
+    for(i=1; i< K; i++) FF[i] = (double)(i)/dat->Tobs;
+    FF[0] = FF[1];
+    
+    // reference amplitude and phase
+    Intrinsic(ll, params, dat->Tobs, K, FF, TF, PF, AF);
+    
+    Antenna(params, dat->Tstart, dat->Tend, K, FF, TF, Aamp, Eamp, Aphase, Ephase);
+    
+    out = fopen("ft_ant.dat","w");
+    for(i=0; i< K; i++)
+       {
+           if(FF[i] < fr && TF[i] < dat->Tend && TF[i] > dat->Tstart) fprintf(out, "%e %e %e %e %e %e\n", TF[i], FF[i], Aamp[i], Eamp[i], Aphase[i], Ephase[i]);
+       }
+    
+    free(Aamp);
+    free(Eamp);
+    free(Aphase);
+    free(Ephase);
+    free(FF);
+    free(TF);
+    free(PF);
+    free(AF);
+    
+}
+
+// Just the antenna pattern contributions to the phase and amplitude evolution
+void Antenna(double *params, double Tstart, double Tend, int NF, double *FF, double *TF, double *AAmp, double *EAmp, double *APhase, double *EPhase)
+{
+    
+    /*   Indicies   */
+    int i,j, k, n, m;
+    
+    /*   Time and distance variables   */
+    double *xi;
+    
+    double pa, pe;
+    double paold, peold;
+    double ja, je;
+    
+    /*   Miscellaneous  */
+    double xm, fstep, power, om, mx, tx, x;
+    
+    double *ta, *xia;
+    double *FpAR, *FcAR, *FpER, *FcER;
+    double *FpAI, *FcAI, *FpEI, *FcEI;
+    
+    double t, f, kdotx, Amp, Phase, RR, II;
+    
+    int NA, flag;
+    
+    double iota, cosi;
+    double Aplus, Across;
+    
+    double Tcut;
+    
+    xi = (double*)malloc(sizeof(double)* (NF));
+    FpAR = (double*)malloc(sizeof(double)* (NF));
+    FcAR = (double*)malloc(sizeof(double)* (NF));
+    FpER = (double*)malloc(sizeof(double)* (NF));
+    FcER = (double*)malloc(sizeof(double)* (NF));
+    FpAI = (double*)malloc(sizeof(double)* (NF));
+    FcAI = (double*)malloc(sizeof(double)* (NF));
+    FpEI = (double*)malloc(sizeof(double)* (NF));
+    FcEI = (double*)malloc(sizeof(double)* (NF));
+
+    
+    RAantenna(params, NF, TF, FF, xi, FpAR, FpAI, FcAR, FcAI, FpER, FpEI, FcER, FcEI);
+    
+    for(n=0; n< NF; n++)
+    {
+        AAmp[n] = 0.0;
+        EAmp[n] = 0.0;
+        APhase[n] = 0.0;
+        EPhase[n] = 0.0;
+    }
+    
+    cosi = params[10];  // cos of inclination
+    
+    Aplus = 0.5*(1.+cosi*cosi);
+    Across = -cosi;
+    
+    n = 0;
+    RR = FpAR[n]*Aplus - FcAI[n]*Across;
+    II = FcAR[n]*Across + FpAI[n]*Aplus;
+    paold = atan2(II,RR);
+    if(paold < 0.0) paold += TPI;
+    RR = FpER[n]*Aplus - FcEI[n]*Across;
+    II = FcER[n]*Across + FpEI[n]*Aplus;
+    peold = atan2(II,RR);
+    if(peold < 0.0) peold += TPI;
+    
+    ja = 0.0;
+    je = 0.0;
+
+
+    for(n=0; n< NF; n++)
+    {
+        // Barycenter time and frequency
+        t = TF[n];
+        f = FF[n];
+    
+        kdotx = t-xi[n];
+        
+        //Phase = -2.0*PI*f*kdotx;
+        
+        RR = FpAR[n]*Aplus - FcAI[n]*Across;
+        II = FcAR[n]*Across + FpAI[n]*Aplus;
+        
+        pa = atan2(II,RR);
+        if(pa < 0.0) pa += TPI;
+        
+        if(pa-paold > 6.0) ja -= TPI;
+        if(paold-pa > 6.0) ja += TPI;
+        paold = pa;
+        
+        AAmp[n] = sqrt(RR*RR+II*II);
+        APhase[n] = pa+ja;
+        
+        RR = FpER[n]*Aplus - FcEI[n]*Across;
+        II = FcER[n]*Across + FpEI[n]*Aplus;
+        
+        pe = atan2(II,RR);
+        if(pe < 0.0) pe += TPI;
+        
+        if(pe-peold > 6.0) je -= TPI;
+        if(peold-pe > 6.0) je += TPI;
+        peold = pe;
+        
+        EAmp[n] = sqrt(RR*RR+II*II);
+        EPhase[n] = pe+je;
+        
+
+        
+    }
+    
+    /*   Deallocate Arrays   */
+    
+    free(xi);
+    
+    free(FcAR);
+    free(FpAR);
+    free(FcER);
+    free(FpER);
+    free(FcAI);
+    free(FpAI);
+    free(FcEI);
+    free(FpEI);
+    
+    return;
+}
+
+
 
 void freehet(struct Het *het)
 {
@@ -3442,7 +3619,7 @@ void efix(struct Data *dat, struct Het *het, int hr, int ll, double *params, dou
 void instrument_noise(double f, double *SAE)
 {
     //Power spectral density of the detector noise and transfer frequency
-    double Sn, red, confusion_noise;
+    double Sn, rolla, rollw, confusion_noise;
     double Sloc, fonfs;
     double f1, f2;
     double A1, A2, slope, LC;
@@ -3451,19 +3628,20 @@ void instrument_noise(double f, double *SAE)
     
     fonfs = f/fstar;
     
-    //LC = 16.0*fonfs*fonfs;
+    // To match the LDC power spectra need a factor of 2 here. No idea why... (one sided/two sided?)
+    LC = 2.0*fonfs*fonfs;
     
-    // To match the LDC power spectra I have to divide by 10. No idea why...
-    LC = 1.60*fonfs*fonfs;
-    
-    red = 16.0*((1.0e-4/f)*(1.0e-4/f));
-    // red = 0.0;
+    // roll-offs
+    rolla = (1.0+pow((4.0e-4/f),2.0))*(1.0+pow((f/8.0e-3),4.0));
+    rollw = (1.0+pow((2.0e-3/f),4.0));
     
     // Calculate the power spectral density of the detector noise at the given frequency
     
-    *SAE = LC*16.0/3.0*pow(sin(fonfs),2.0)*( (2.0+cos(fonfs))*(Sps) + 2.0*(3.0+2.0*cos(fonfs)+cos(2.0*fonfs))*(Sacc/pow(2.0*PI*f,4.0)*(1.0+red)) ) / pow(2.0*Larm,2.0);
+    // not and exact match to the LDC, but within 10%
     
-   // *SXYZ = LC*4.0*pow(sin(fonfs),2.0)*( 4.0*(Sps) + 8.0*(1.0+pow(cos(fonfs),2.0))*(Sacc/pow(2.0*PI*f,4.0)*(1.0+red)) ) / pow(2.0*Larm,2.0);
+    *SAE = LC*16.0/3.0*pow(sin(fonfs),2.0)*( (2.0+cos(fonfs))*(Sps)*rollw + 2.0*(3.0+2.0*cos(fonfs)+cos(2.0*fonfs))*(Sacc/pow(2.0*PI*f,4.0)*rolla) ) / pow(2.0*Larm,2.0);
+    
+   // *SXYZ = LC*16.0*pow(sin(fonfs),2.0)*( (Sps)*rollw + 2.0*(1.0+pow(cos(fonfs),2.0))*(Sacc/pow(2.0*PI*f,4.0)*rolla) ) / pow(2.0*Larm,2.0);
     
 }
 
@@ -3809,8 +3987,8 @@ void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *
             Amp = x*AF[m];
             Phase = ap->phase[m]+2.0*phic;
             
-            HC = Amp*cos(2.0*PI*f*(Tobs-tc+dat->dt/2.0-kdotx)-Phase);
-            HS = Amp*sin(2.0*PI*f*(Tobs-tc+dat->dt/2.0-kdotx)-Phase);
+            HC = Amp*cos(2.0*PI*f*(dat->Tend-tc+dat->dt/2.0-kdotx)-Phase);
+            HS = Amp*sin(2.0*PI*f*(dat->Tend-tc+dat->dt/2.0-kdotx)-Phase);
             
 
             AS[n] = FpAR[m]*Aplus*HC - FpAI[m]*Aplus*HS - FcAR[m]*Across*HS - FcAI[m]*Across*HC;
@@ -3971,7 +4149,7 @@ void ResponseFast(struct Data *dat, int ll, double *params, double *AS, double *
         if(f > FF[0] && f < FF[NF-1])
         {
             // put in time/phase shift and restore intrinsic phase evolution
-            px = 2.0*PI*f*(dat->Tobs-tc + dat->dt/2.0)-2.0*phic-gsl_spline_eval (Pspline, f, Pacc);
+            px = 2.0*PI*f*(dat->Tend-tc + dat->dt/2.0)-2.0*phic-gsl_spline_eval (Pspline, f, Pacc);
             cpx = cos(px);
             spx = sin(px);
             

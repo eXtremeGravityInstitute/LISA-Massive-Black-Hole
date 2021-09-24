@@ -57,21 +57,23 @@ int main(int argc,char **argv)
     int i, j, k, id, mc;
     int ii, jj, kk, ll, flag;
     double x, y, z, f, dt;
-    double Tobs, Tseg;
+    double Tobs, Tseg, Tend;
     int N, Nseg, Nch;
     double **params, **paramsU;
-    double *SNR, *SNRU, *Mc, *McU;
+    double *SNR, *SNRU, *Mc, *McU, *Mt, *MtU;
+    double SNRThresh = 12.0;
+    double SNRT;
     int *NS;
     int NST, NSU;
+    int *WS, *WSU;
     FILE *in;
     FILE *out;
     
     Nch = 2;
-    Nseg = 12;
+    Nseg = 23;
     N = 524288;
     dt = 5.0;
     Tseg = dt*(double)(N);
-    
     
     NS = int_vector(Nseg);
     
@@ -95,7 +97,11 @@ int main(int argc,char **argv)
     SNR = double_vector(NST);
     Mc = double_vector(NST);
     McU = double_vector(NST);
+    Mt = double_vector(NST);
+    MtU = double_vector(NST);
     SNRU = double_vector(NST);
+    WS = int_vector(NST);
+    WSU = int_vector(NST);
     
     ii = 0;
     for(j=0; j< Nseg; j++)
@@ -108,8 +114,12 @@ int main(int argc,char **argv)
               SNR[ii] = sqrt(2.0*x);
               for(k=0; k< NP; k++) fscanf(in,"%lf", &params[ii][k]);
               fclose(in);
+              Mt[ii] = params[ii][0]+params[ii][1];
               Mc[ii] = pow((params[ii][0]*params[ii][1]),3.0/5.0)/pow((params[ii][0]+params[ii][1]),1.0/5.0);
-              //printf("%f %e %e\n", SNR[ii], params[ii][5], (double)(j+1)*Tseg);
+              WS[ii] = j;
+              SNRT = SNRThresh + log(Mt[ii]/1.0e5);
+              if(SNRT < SNRThresh) SNRT = SNRThresh;
+              printf("%f %f %e %e %e %e\n", SNR[ii], SNRT, Mt[ii], Mc[ii], params[ii][5], Tseg+(double)(j)*Tseg/2.0);
               ii++;
           }
         }
@@ -119,30 +129,39 @@ int main(int argc,char **argv)
       paramsU = double_matrix(NST,NP);
       ii = 0;
       jj = 0;
+    
+      Tend = Tseg;
+    
        for(j=0; j< Nseg-1; j++)
            {
+               
            for(i=0; i< NS[j]; i++)
              {
                 //printf("%d %d\n", ii, jj);
                 // only keep sources that merge in a given segment
                 // only keep sources with large enough SNR
-                // skip sources that are in the boundary regions (impacted by Tukey filter)
-            if(params[ii][5] < (double)(j+1)*Tseg && SNR[ii] > 12.0 && fabs(params[ii][5]-(double)(j)*Tseg) > 1.0e5 && fabs(params[ii][5]-(double)(j+1)*Tseg) > 1.0e5 && fabs(params[ii][5]-(double)(j+2)*Tseg) > 1.0e5)
+                 
+                SNRT = SNRThresh + log(Mt[ii]/1.0e5);
+                if(SNRT < SNRThresh) SNRT = SNRThresh;
+            
+            if(params[ii][5] < Tend && SNR[ii] > SNRT)
                {
                    flag = 0;
                    
                  for(kk=0; kk< jj; kk++)
                  {
-                     y = fabs(params[ii][5]-paramsU[kk][5])/3600.0;
+                     y = fabs(params[ii][5]-paramsU[kk][5])/1.0e4;
                      z = fabs(Mc[ii]-McU[kk])/(Mc[ii]+McU[kk]);
-                    // if(y < 50.0 && z < 0.2) printf("%f %f %e %e %e %e\n", y, z, params[ii][5], paramsU[kk][5], Mc[ii], McU[kk]);
-                    if(y < 1.0 && z < 0.2 && SNR[ii] < 20.0)
+                     //if(y < 10.0 && z < 0.2) printf("%f %f %e %e %e %e\n", y, z, params[ii][5], paramsU[kk][5], Mc[ii], McU[kk]);
+                    if(y < 1.0 && z < 0.2)
                     {
                         flag = 1;
                         if(SNR[ii] > SNRU[kk]) // we will take the higher SNR copy
                         {
                             SNRU[kk] = SNR[ii];
                             McU[kk] = Mc[ii];
+                            MtU[kk] = Mt[ii];
+                            WSU[kk] = WS[ii];
                             for(k=0; k< NP; k++) paramsU[kk][k] = params[ii][k];
                         }
                     }
@@ -151,24 +170,32 @@ int main(int argc,char **argv)
                 {
                 for(k=0; k< NP; k++) paramsU[jj][k] = params[ii][k];
                 McU[jj] = Mc[ii];
+                MtU[jj] = Mt[ii];
                 SNRU[jj] = SNR[ii];
+                WSU[jj] = WS[ii];
                 jj++;
                 }
                }
               ii++;
              }
+               Tend += Tseg/2.0;
            }
     
     // for the last segment keep all the sources
     j = Nseg-1;
     for(i=0; i< NS[j]; i++)
     {
-       if(SNR[ii] > 12.0)
+        SNRT = SNRThresh + log(Mt[ii]/1.0e5);
+        if(SNRT < SNRThresh) SNRT = SNRThresh;
+        
+       if(SNR[ii] > SNRT)
        {
          for(k=0; k< NP; k++) paramsU[jj][k] = params[ii][k];
         // printf("%d %e\n", i, params[ii][5]);
          McU[jj] = Mc[ii];
+         MtU[jj] = Mt[ii];
          SNRU[jj] = SNR[ii];
+         WSU[jj] = WS[ii];
          jj++;
        }
          ii++;
@@ -192,8 +219,8 @@ int main(int argc,char **argv)
     out = fopen("source_info.dat","w");
     for(i=0; i< NSU; i++)
     {
-       printf("Source %d merges in segment %d\n", i, (int)(paramsU[i][5]/Tseg));
-       fprintf(out,"Source %d merges in segment %d\n", i, (int)(paramsU[i][5]/Tseg));
+        printf("Source %d found in segment %d\n", i, WSU[i]);
+        fprintf(out,"Source %d found in segment %d\n", i, WSU[i]);
     }
     fclose(out);
     

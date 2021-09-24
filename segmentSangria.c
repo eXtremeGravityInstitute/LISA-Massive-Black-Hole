@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 double cosw(double t, double Tint);
 
 #define DATASET "/obs/tdi"
-#define FILENAME "LDC2_sangria_training_v1.h5"
+#define FILENAME "LDC2_sangria_blind_v2.h5"
 
 struct TDI
 {
@@ -73,7 +73,7 @@ void alloc_tdi(struct TDI *tdi, int N, int Nchannel);
 
 int main(int argc, char *argv[])
 {
-  int i, j, k, N, M, is;
+  int i, j, k, N, M, is, ii;
   int Ns, Ng;
   double fac;
   double t, f, x, y, Tend;
@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
 
     /* LDC-formatted structure for compound HDF5 dataset */
     typedef struct tdi_dataset {
-        double time;
+        double t;
         double    X;
         double    Y;
         double    Z;
@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
     hid_t ldc_data_tid;
     
     ldc_data_tid = H5Tcreate(H5T_COMPOUND, sizeof(struct tdi_dataset));
-    H5Tinsert(ldc_data_tid, "time", HOFFSET(struct tdi_dataset, time), H5T_IEEE_F64LE);
+    H5Tinsert(ldc_data_tid, "t", HOFFSET(struct tdi_dataset, t), H5T_IEEE_F64LE);
     H5Tinsert(ldc_data_tid, "X", HOFFSET(struct tdi_dataset, X), H5T_IEEE_F64LE);
     H5Tinsert(ldc_data_tid, "Y", HOFFSET(struct tdi_dataset, Y), H5T_IEEE_F64LE);
     H5Tinsert(ldc_data_tid, "Z", HOFFSET(struct tdi_dataset, Z), H5T_IEEE_F64LE);
@@ -153,7 +153,7 @@ int main(int argc, char *argv[])
     }
     
     
-    tdi->delta = ldc_data[1].time - ldc_data[0].time;
+    tdi->delta = ldc_data[1].t - ldc_data[0].t;
     
     printf("Samples %d dt %f\n", Nsamples, tdi->delta);
     
@@ -191,6 +191,9 @@ int main(int argc, char *argv[])
     Nseg = (int)(y);
     segs = (int)(Tdata/Tseg);
     
+    // allowing for 50% overlap
+    segs = 2*segs-1;
+    
     printf("Number of segments %d\n", segs);
     printf("Points per segement %d\n", Nseg);
     printf("Segment length (s) %.0f\n", Tseg);
@@ -205,12 +208,14 @@ int main(int argc, char *argv[])
     
     fac = sqrt(Tseg)/(double)(Nseg);   // Fourier scaling
     
+   ii = 0;
+    
    for (j = 0; j < segs; ++j)
    {
        
      for (i = 0; i < Nseg; ++i)
       {
-       k = i+j*Nseg;
+       k = i+ii;
        A[i] = tdi->A[k];
        E[i] = tdi->E[k];
        T[i] = tdi->T[k];
@@ -220,7 +225,7 @@ int main(int argc, char *argv[])
        out = fopen(command,"w");
        for(i=0; i< Nseg; i++)
        {
-           k = i+j*Nseg;
+           k = i+ii;
            t = (double)(k)*tdi->delta;
            fprintf(out,"%.15e %.15e %.15e %.15e\n", t, A[i], E[i], T[i]);
        }
@@ -250,6 +255,8 @@ int main(int argc, char *argv[])
            fprintf(out,"%e %.12e %.12e %.12e\n", f, A[i], E[i], T[i]);
        }
        fclose(out);
+       
+       ii += Nseg/2;  //brick pattern
        
    }
     

@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 
 // OSX
-// clang -Xpreprocessor -fopenmp -lomp -w -o  PTMCMC PTMCMC.c Utils.c Response.c IMRPhenomD_internals.c IMRPhenomD.c -lgsl -lgslcblas  -lm
+// clang -O3 -Xpreprocessor -fopenmp -lomp -w -o  PTMCMC PTMCMC.c Utils.c Response.c IMRPhenomD_internals.c IMRPhenomD.c -lgsl -lgslcblas  -lm
 
 // Linux
 // gcc -std=gnu99 -fopenmp -w -o PTMCMC PTMCMC.c IMRPhenomD_internals.c IMRPhenomD.c Utils.c Response.c -lgsl -lgslcblas  -lm
@@ -180,8 +180,8 @@ int main(int argc,char **argv)
     if(seg > -1)
     {
     
-    dat->Tstart = (double)(seg)*dat->Tobs;
-    dat->Tend = (double)(seg+1)*dat->Tobs;
+       dat->Tstart = (double)(seg)*dat->Tobs/2.0;
+       dat->Tend = dat->Tstart + dat->Tobs;
     
     // read in the previously estimated smooth and full PSDs
     for(id=0; id < dat->Nch; id++)
@@ -191,6 +191,7 @@ int main(int argc,char **argv)
       for(i=0; i< dat->N/2; i++)
       {
         fscanf(in,"%lf%lf%lf%lf\n", &f, &dat->SM[id][i], &x, &dat->SN[id][i]);
+          //dat->SN[id][i] = dat->SM[id][i];
       }
       fclose(in);
     }
@@ -239,6 +240,7 @@ int main(int argc,char **argv)
     AS = double_vector(dat->N);
     ES = double_vector(dat->N);
     in = fopen("search_sources.dat","r");
+        
    
     for(k=0; k < NS; k++)
     {
@@ -301,8 +303,6 @@ int main(int argc,char **argv)
           // change to better intrinsic parameterization
           map_params(2, params);
         
-      
-        
            for(i=1; i< dat->N/2; i++)
            {
                f = (double)(i)/dat->Tobs;
@@ -317,7 +317,7 @@ int main(int argc,char **argv)
             dat->SM[1][0] = dat->SM[0][1];
             dat->SN[1][0] = dat->SM[0][1];
         
-        out = fopen("spec.dat","w");
+        out = fopen("spec_MRD.dat","w");
         for(i=1; i< dat->N/2; i++)
          {
             f = (double)(i)/dat->Tobs;
@@ -469,6 +469,10 @@ void MCMC(struct Data *dat, struct Het *het, int ll, int *who, double **paramx)
     EAmp = (double*)malloc(sizeof(double)* (NF));
     APhase = (double*)malloc(sizeof(double)* (NF));
     EPhase = (double*)malloc(sizeof(double)* (NF));
+    
+    antennaphaseamp(dat, ll, pref);
+    
+   
 
     sacc = int_vector(NC);
     scount = int_vector(NC);
@@ -596,7 +600,6 @@ void MCMC(struct Data *dat, struct Het *het, int ll, int *who, double **paramx)
       printf("full likelihood calculation took %f seconds\n", cpu_time_used/100.0);
     */
     
-    
 
     for (i=0; i< NC; i++)
     {
@@ -626,6 +629,14 @@ void MCMC(struct Data *dat, struct Het *het, int ll, int *who, double **paramx)
 
     av = int_matrix(5,NC);
     cv = int_matrix(5,NC);
+    
+    for(j = 0; j < 20; j++)
+       {
+    for(k=0; k < NC; k++)
+        {
+            x = gsl_rng_uniform(rvec[k]);
+        }
+       }
     
     for(j = 0; j < 5; j++)
     {
@@ -669,14 +680,14 @@ void MCMC(struct Data *dat, struct Het *het, int ll, int *who, double **paramx)
     
     for(mc = 1; mc <= M; mc++)
     {
-        /*
-        if(mc%1000==0)
+    
+        if(mc%10000==0)
         {
         freehet(het);
         het_space(dat, het, ll, pmax, min, max);
         heterodyne(dat, het, ll, pmax);
         }
-        */
+        
         
         if(mc%10000==0  && lhold == 0)
         {
