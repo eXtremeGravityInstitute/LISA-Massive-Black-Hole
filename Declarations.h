@@ -76,6 +76,7 @@ double ***double_tensor(int N, int M, int L);
 void free_double_tensor(double ***t, int N, int M);
 void Inverse(double **M, double **IM, int d);
 void spacecraft(double t,  double *x, double *y, double *z);
+void Antenna(double *params, int NF, double *FF, double *TF, double *AAmp, double *EAmp, double *APhase, double *EPhase);
 void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, double *FpAR, double *FpAI, double *FcAR, double *FcAI,
                double *FpER, double *FpEI, double *FcER, double *FcEI);
 void timearray(double *params, RealVector *freq, long N, double *TF, AmpPhaseFDWaveform *ap);

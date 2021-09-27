@@ -39,7 +39,7 @@
 #endif
 
 // OSX
-// clang -Xpreprocessor -fopenmp -lomp -w -o  PTMCMC PTMCMC.c Utils.c Response.c IMRPhenomD_internals.c IMRPhenomD.c -lgsl -lgslcblas  -lm
+// clang -O3 -Xpreprocessor -fopenmp -lomp -w -o  PTMCMC PTMCMC.c Utils.c Response.c IMRPhenomD_internals.c IMRPhenomD.c -lgsl -lgslcblas  -lm
 
 // Linux
 // gcc -std=gnu99 -fopenmp -w -o PTMCMC PTMCMC.c IMRPhenomD_internals.c IMRPhenomD.c Utils.c Response.c -lgsl -lgslcblas  -lm
@@ -47,22 +47,44 @@
 /* total number of chains */
 #define NC 24
 
+//##############################################
+//MT modifications
+
+gsl_rng **rvec;
+//##############################################
+
 void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **params);
 
 int main(int argc,char **argv)
 {
+    int NP = NParams; /* NP as a global variable clashed w/ Global Fit */
+  double f, fdot, theta, phi, A, iota, psi, phase;
+  char Gfile[50];
+  char filename[50];
+  double *params, *premove, *pnew;
+  double *AS, *ES;
+  double *AQ, *EQ;
+  double AR, AI, ER, EI;
+  double fonfs, Sn, Sm, Acut;
+  double Aar, Aai;
+  double x, y, z;
+  long M, q;
+  long i, j, k, cnt, mult, id, NS;
+  double Mc, fstart, fstop, fr;
+  double SNR, logL;
+  double HH, HD, HDQ, DD, Match, MX, ts, ps;
+  double HHA, HDA, DDA, HHE, HDE, DDE, MA, ME;
     
-    double f;
-    char filename[50];
-    double *params, *premove;
-    double *AS, *ES;
-    double x;
-    long i, j, k, id, NS;
+  struct Het *het   = malloc(sizeof(struct Het));
+  struct MBH_Data *dat  = malloc(sizeof(struct MBH_Data));
     
-    struct Het *het = malloc(sizeof(struct Het));
-    struct MBH_Data *dat = malloc(sizeof(struct MBH_Data));
+  double *AC, *EC, *TC;
     
     int seg, rep;
+    
+    
+    clock_t start, end;
+    double cpu_time_used;
     
     const gsl_rng_type * P;
     gsl_rng * r;
@@ -72,170 +94,183 @@ int main(int argc,char **argv)
     P = gsl_rng_default;
     r = gsl_rng_alloc (P);
     
-    FILE* in;
-    FILE* out;
+  FILE* in;
+  FILE* out;
     
-    params = (double*)malloc(sizeof(double)* (NParams));
-    premove = (double*)malloc(sizeof(double)* (NParams));
+    //##############################################
+    //open MP modifications
+    omp_set_num_threads(NC);
+    rvec = (gsl_rng **)malloc(sizeof(gsl_rng *) * (NC+1));
+    for(i = 0 ; i<= NC; i++){
+        rvec[i] = gsl_rng_alloc(P);
+        gsl_rng_set(rvec[i] , i);
+    }
+    //##############################################
+    
+    
+    params = (double*)malloc(sizeof(double)* (NP));
+    premove = (double*)malloc(sizeof(double)* (NP));
     
     
     if(LDC == 1)  // LDC = 1 tells the code to analyze LDC data. Otherwise it does a noise-free run on the parameters provided
     {
+    
+    // setting the segment # to -1 causes the code to use the full data set
+    
+    if(argc<3)
+    {
+        printf("./PTMCMC segment# source#\n");
+        printf("segment numbers run from 0 to 12\n");
+        printf("source numbers start at 0\n");
+        return 0;
+    }
+    
+    seg = atoi(argv[1]);
+    rep = atoi(argv[2]);
+    
+    if(seg > 0)
+    {
+        dat->Tobs = Tsegment;
+    }
+    else
+    {
+        dat->Tobs = 16.0*Tsegment;
+    }
+    
+    dat->sqrtTobs = sqrt(dat->Tobs);
         
-        // setting the segment # to -1 causes the code to use the full data set
-        
-        if(argc<3)
-        {
-            printf("./PTMCMC segment# source#\n");
-            printf("segment numbers run from 0 to 12\n");
-            printf("source numbers start at 0\n");
-            return 0;
-        }
-        
-        seg = atoi(argv[1]);
-        rep = atoi(argv[2]);
-        
-        if(seg > 0)
-        {
-            dat->Tobs = Tsegment;
-        }
-        else
-        {
-            dat->Tobs = 16.0*Tsegment;
-        }
-        
-        dat->sqrtTobs = sqrt(dat->Tobs);
-        
-        dat->dt = cadence;
-        
-        dat->Nch = 2;  // only analyze A, E
-        dat->N = (int)(dat->Tobs/dat->dt);
-        
-        dat->SN = double_matrix(dat->Nch,dat->N/2);
-        dat->SM = double_matrix(dat->Nch,dat->N/2);
-        dat->data = double_matrix(dat->Nch,dat->N);
-        
-        // count the sources
-        in = fopen("search_sources.dat","r");
-        NS = -1;
-        while ((j = fgetc(in)) != EOF)
+    dat->dt = cadence;
+    
+    dat->Nch = 2;  // only analyze A, E
+    dat->N = (int)(dat->Tobs/dat->dt);
+    
+    dat->SN = double_matrix(dat->Nch,dat->N/2);
+    dat->SM = double_matrix(dat->Nch,dat->N/2);
+    dat->data = double_matrix(dat->Nch,dat->N);
+    
+    // count the sources
+    in = fopen("search_sources.dat","r");
+    NS = -1;
+    while ((j = fgetc(in)) != EOF)
+    {
+     fscanf(in,"%lf%lf", &x, &x);
+     for(i=0; i< NP; i++) fscanf(in,"%lf", &x);
+    NS++;
+    }
+    
+    rewind(in);
+
+    // extract the source to be analyzed
+    for(k=0; k < NS; k++)
+    {
+        if(k == rep)
         {
             fscanf(in,"%lf%lf", &x, &x);
-            for(i=0; i< NParams; i++) fscanf(in,"%lf", &x);
-            NS++;
+            for(i=0; i< NP; i++) fscanf(in,"%lf", &params[i]);
+            //printf("%e\n", params[5]);
         }
-        
-        rewind(in);
-        
-        // extract the source to be analyzed
-        for(k=0; k < NS; k++)
+        else // wind the file
         {
-            if(k == rep)
-            {
-                fscanf(in,"%lf%lf", &x, &x);
-                for(i=0; i< NParams; i++) fscanf(in,"%lf", &params[i]);
-                //printf("%e\n", params[5]);
-            }
-            else // wind the file
-            {
-                fscanf(in,"%lf%lf", &x, &x);
-                for(i=0; i< NParams; i++) fscanf(in,"%lf", &x);
-            }
+        fscanf(in,"%lf%lf", &x, &x);
+        for(i=0; i< NP; i++) fscanf(in,"%lf", &x);
+        }
+    }
+    fclose(in);
+    
+    // read in the data and PSDs
+    if(seg > -1)
+    {
+    
+       dat->Tstart = (double)(seg)*dat->Tobs/2.0;
+       dat->Tend = dat->Tstart + dat->Tobs;
+    
+    // read in the previously estimated smooth and full PSDs
+    for(id=0; id < dat->Nch; id++)
+    {
+      sprintf(filename, "specfit_%d_%d.dat", id, seg);
+      in = fopen(filename,"r");
+      for(i=0; i< dat->N/2; i++)
+      {
+        fscanf(in,"%lf%lf%lf%lf\n", &f, &dat->SM[id][i], &x, &dat->SN[id][i]);
+          //dat->SN[id][i] = dat->SM[id][i];
+      }
+      fclose(in);
+    }
+ 
+    // Read in FFTed LDC data
+    sprintf(filename, "AET_seg%d_f.dat", seg);
+    in = fopen(filename,"r");
+    for(i=0; i< dat->N; i++)
+    {
+        fscanf(in,"%lf%lf%lf%lf\n", &f, &dat->data[0][i], &dat->data[1][i], &x);
+    }
+    fclose(in);
+        
+    }
+    else  // using full data
+    {
+        dat->Tstart = 0.0;
+        dat->Tend = dat->Tobs;
+        
+        // Read in FFTed LDC data
+        in = fopen("AET_f.dat","r");
+        for(i=0; i< dat->N; i++)
+        {
+            fscanf(in,"%lf%lf%lf%lf\n", &f, &dat->data[0][i], &dat->data[1][i], &x);
         }
         fclose(in);
         
-        // read in the data and PSDs
-        if(seg > -1)
+        // read in the previously estimated smooth and full PSDs
+        for(id=0; id < dat->Nch; id++)
         {
-            
-            dat->Tstart = (double)(seg)*dat->Tobs;
-            dat->Tend = (double)(seg+1)*dat->Tobs;
-            
-            // read in the previously estimated smooth and full PSDs
-            for(id=0; id < dat->Nch; id++)
-            {
-                sprintf(filename, "specfit_%ld_%d.dat", id, seg);
-                in = fopen(filename,"r");
-                for(i=0; i< dat->N/2; i++)
-                {
-                    fscanf(in,"%lf%lf%lf%lf\n", &f, &dat->SM[id][i], &x, &dat->SN[id][i]);
-                }
-                fclose(in);
-            }
-            
-            // Read in FFTed LDC data
-            sprintf(filename, "AET_seg%d_f.dat", seg);
-            in = fopen(filename,"r");
-            for(i=0; i< dat->N; i++)
-            {
-                fscanf(in,"%lf%lf%lf%lf\n", &f, &dat->data[0][i], &dat->data[1][i], &x);
-            }
-            fclose(in);
-            
+          sprintf(filename, "specav_%d.dat", id);
+          in = fopen(filename,"r");
+          for(i=0; i< dat->N/2; i++)
+          {
+            fscanf(in,"%lf%lf%lf\n", &f, &dat->SM[id][i], &dat->SN[id][i]);
+          }
+          fclose(in);
         }
-        else  // using full data
+
+    }
+    
+    printf("%.0f %.0f %d\n", dat->Tobs, dat->Tstart, dat->N);
+    
+    
+    // form up residual by subtracting other BH signals
+    AS = double_vector(dat->N);
+    ES = double_vector(dat->N);
+    in = fopen("search_sources.dat","r");
+        
+   
+    for(k=0; k < NS; k++)
+    {
+        fscanf(in,"%lf%lf", &x, &x);
+        for(i=0; i< NP; i++) fscanf(in,"%lf", &premove[i]);
+        
+        if(k == rep)
         {
-            dat->Tstart = 0.0;
-            dat->Tend = dat->Tobs;
-            
-            // Read in FFTed LDC data
-            in = fopen("AET_f.dat","r");
-            for(i=0; i< dat->N; i++)
-            {
-                fscanf(in,"%lf%lf%lf%lf\n", &f, &dat->data[0][i], &dat->data[1][i], &x);
-            }
-            fclose(in);
-            
-            // read in the previously estimated smooth and full PSDs
-            for(id=0; id < dat->Nch; id++)
-            {
-                sprintf(filename, "specav_%ld.dat", id);
-                in = fopen(filename,"r");
-                for(i=0; i< dat->N/2; i++)
-                {
-                    fscanf(in,"%lf%lf%lf\n", &f, &dat->SM[id][i], &dat->SN[id][i]);
-                }
-                fclose(in);
-            }
-            
+            if(premove[5] < dat->Tstart || premove[5] > dat->Tend) printf("WARNING: source does not merge during the chosen time interval\n");
         }
         
-        printf("%.0f %.0f %d\n", dat->Tobs, dat->Tstart, dat->N);
-        
-        
-        // form up residual by subtracting other BH signals
-        AS = double_vector(dat->N);
-        ES = double_vector(dat->N);
-        in = fopen("search_sources.dat","r");
-        
-        for(k=0; k < NS; k++)
-        {
-            fscanf(in,"%lf%lf", &x, &x);
-            for(i=0; i< NParams; i++) fscanf(in,"%lf", &premove[i]);
-            
-            if(k == rep)
+        if(k != rep)
+          {
+          // only subtract sources that have not merged
+            if(premove[5] > dat->Tstart)
             {
-                if(premove[5] < dat->Tstart || premove[5] > dat->Tend) printf("WARNING: source does not merge during the chosen time interval\n");
+            map_params(2, premove);
+            ResponseFreq(dat, 2, premove, AS, ES);
+             for(i=0; i< dat->N; i++)
+             {
+              dat->data[0][i] -= AS[i];
+              dat->data[1][i] -= ES[i];
+             }
             }
-            
-            if(k != rep)
-            {
-                // only subtract sources that have not merged
-                if(premove[5] > dat->Tstart)
-                {
-                    map_params(2, premove);
-                    ResponseFreq(dat, 2, premove, AS, ES);
-                    for(i=0; i< dat->N; i++)
-                    {
-                        dat->data[0][i] -= AS[i];
-                        dat->data[1][i] -= ES[i];
-                    }
-                }
-            }
-        }
-        fclose(in);
-        free_double_vector(AS);
-        free_double_vector(ES);
+          }
+    }
+    fclose(in);
+    free_double_vector(AS);
+    free_double_vector(ES);
         
         // change to better intrinsic parameterization
         map_params(2, params);
@@ -245,52 +280,50 @@ int main(int argc,char **argv)
     {
         
         if(argc<3)
-        {
-            printf("./PTMCMC Tobs cadence\n");
-            // typical cadence is around 5 seconds.
-            return 0;
-        }
+           {
+               printf("./PTMCMC Tobs cadence\n");
+               // typical cadence is around 5 seconds.
+               return 0;
+           }
+          
+           dat->Tobs = atof(argv[1]);
+           dat->sqrtTobs = sqrt(dat->Tobs);
+           dat->Tstart = 0.0;
+           dat->Tend = dat->Tobs;
+           dat->dt = atof(argv[2]);
+           dat->Nch = 2;  // only analyze A, E
+           dat->N = (int)(dat->Tobs/dat->dt);
+           dat->SN = double_matrix(dat->Nch,dat->N/2);
+           dat->SM = double_matrix(dat->Nch,dat->N/2);
+           dat->data = double_matrix(dat->Nch,dat->N);
         
-        dat->Tobs = atof(argv[1]);
-        dat->sqrtTobs = sqrt(dat->Tobs);
-        dat->Tstart = 0.0;
-        dat->Tend = dat->Tobs;
-        dat->dt = atof(argv[2]);
-        dat->Nch = 2;  // only analyze A, E
-        dat->N = (int)(dat->Tobs/dat->dt);
-        dat->SN = double_matrix(dat->Nch,dat->N/2);
-        dat->SM = double_matrix(dat->Nch,dat->N/2);
-        dat->data = double_matrix(dat->Nch,dat->N);
+          in = fopen("source.dat","r");
+          for(i=0; i< NP; i++) fscanf(in,"%lf", &params[i]);
+          fclose(in);
         
-        in = fopen("source.dat","r");
-        for(i=0; i< NParams; i++) fscanf(in,"%lf", &params[i]);
-        fclose(in);
+          // change to better intrinsic parameterization
+          map_params(2, params);
         
-        // change to better intrinsic parameterization
-        map_params(2, params);
+           for(i=1; i< dat->N/2; i++)
+           {
+               f = (double)(i)/dat->Tobs;
+               instrument_noise(f, &dat->SM[0][i]);
+               dat->SN[0][i] = dat->SM[0][i];
+               dat->SM[1][i] = dat->SM[0][i];
+               dat->SN[1][i] = dat->SM[0][i];
+           }
         
+            dat->SM[0][0] = dat->SM[0][1];
+            dat->SN[0][0] = dat->SM[0][1];
+            dat->SM[1][0] = dat->SM[0][1];
+            dat->SN[1][0] = dat->SM[0][1];
         
-        
+        out = fopen("spec_MRD.dat","w");
         for(i=1; i< dat->N/2; i++)
-        {
-            f = (double)(i)/dat->Tobs;
-            instrument_noise(f, &dat->SM[0][i]);
-            dat->SN[0][i] = dat->SM[0][i];
-            dat->SM[1][i] = dat->SM[0][i];
-            dat->SN[1][i] = dat->SM[0][i];
-        }
-        
-        dat->SM[0][0] = dat->SM[0][1];
-        dat->SN[0][0] = dat->SM[0][1];
-        dat->SM[1][0] = dat->SM[0][1];
-        dat->SN[1][0] = dat->SM[0][1];
-        
-        out = fopen("spec.dat","w");
-        for(i=1; i< dat->N/2; i++)
-        {
+         {
             f = (double)(i)/dat->Tobs;
             fprintf(out, "%e %e\n", f, dat->SM[0][i]);
-        }
+         }
         fclose(out);
         
         AS = double_vector(dat->N);
@@ -300,22 +333,22 @@ int main(int argc,char **argv)
         ResponseFreq(dat, 2, params, AS, ES);
         for(i=0; i< dat->N; i++)
         {
-            dat->data[0][i] = AS[i];
-            dat->data[1][i] = ES[i];
+         dat->data[0][i] = AS[i];
+         dat->data[1][i] = ES[i];
         }
-        
+          
     }
-    
+
     
     double **paramx;
-    paramx = double_matrix(NC,NParams);
+    paramx = double_matrix(NC,NP);
     
     // here we copy the best fit source into all the chains
     // in the global fit the previous state for each chain
     // will instead be passed in
     for (i=0; i< NC; i++)
     {
-        for (j=0; j< NParams; j++) paramx[i][j] = params[j];
+        for (j=0; j< NP; j++) paramx[i][j] = params[j];
     }
     
     // set up the whos-who reference. In the global fit this will be passed
@@ -327,9 +360,16 @@ int main(int argc,char **argv)
     // perform the MCMC
     MCMC(dat, het, 2, who, paramx);
     
+    //###############################################
+    //MT modification
+       for(i =0 ;i<= NC; i++){
+        gsl_rng_free(rvec[i]);
+    }
+    free(rvec);
+    //###############################################
     
     free(params);
-    
+ 
     return 1;
     
 }
@@ -344,6 +384,7 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
     int M = 2000000;
     double *heat;
     double **paramy;
+    double *pref;
     double ***Fisher;
     double ***history;
     double *min, *max;
@@ -379,7 +420,12 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
     N = dat->N;
     
     pmax = (double*)malloc(sizeof(double)* (NParams));
+    pref = (double*)malloc(sizeof(double)* (NParams));
+
+    antennaphaseamp(dat, ll, pref);
     
+   
+
     sacc = int_vector(NC);
     scount = int_vector(NC);
     heat = double_vector(NC);
@@ -417,7 +463,28 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
             for (j=0; j< NParams; j++) history[i][k][j] = paramx[i][j];
         }
     }
+
+    /*
+     start = clock();
+     for(i=0; i<100; i++) x = log_likelihood_het(dat, het, ll, paramx[0], sx[0]);
+     end = clock();
+     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+     printf("heterodyned likelihood calculation took %f seconds\n", cpu_time_used/100.0);
     
+      start = clock();
+      for(i=0; i<100; i++) x = Likelihood(dat, ll, paramx[0]);
+      end = clock();
+      cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+      printf("fast likelihood calculation took %f seconds\n", cpu_time_used/100.0);
+    
+      start = clock();
+      for(i=0; i<100; i++) x = Likelihood_Slow(dat, ll, paramx[0]);
+      end = clock();
+      cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+      printf("full likelihood calculation took %f seconds\n", cpu_time_used/100.0);
+    */
+    
+
     //initialize likelihood for each chain
     for (i=0; i< NC; i++)
     {
@@ -448,6 +515,14 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
     
     av = int_matrix(5,NC);
     cv = int_matrix(5,NC);
+    
+    for(j = 0; j < 20; j++)
+       {
+    for(k=0; k < NC; k++)
+        {
+            x = gsl_rng_uniform(rvec[k]);
+        }
+       }
     
     for(j = 0; j < 5; j++)
     {
@@ -503,14 +578,14 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
     
     for(mc = 1; mc <= M; mc++)
     {
-        /*
-         if(mc%1000==0)
-         {
-         freehet(het);
-         het_space(dat, het, ll, pmax, min, max);
-         heterodyne(dat, het, ll, pmax);
-         }
-         */
+    
+        if(mc%10000==0)
+        {
+        freehet(het);
+        het_space(dat, het, ll, pmax, min, max);
+        heterodyne(dat, het, ll, pmax);
+        }
+        
         
         if(mc%10000==0  && lhold == 0)
         {

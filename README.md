@@ -6,11 +6,11 @@ gcc -o segmentSangria segmentSangria.c -lhdf5 -lgsl
 
 ./segmentSangria
 
-The code also pads the data out to 16 times the length of one segment and FFTs the windowed and padded data. This can be used when running on the full data set. [TODO - change from radix 2 FFTs to general FFTs so less padding needed.] The segment code does not talk very long to run. Next up we need PSD estimates. This is done by invoking the script
+The code also pads the data out to 16 times the length of one segment and FFTs the windowed and padded data. The segments overlap by half their duration. This can be used when running on the full data set. [TODO - change from radix 2 FFTs to general FFTs so less padding needed.] The segment code does not take very long to run. Next up we need PSD estimates. This is done by invoking the script
 
-source spec.sh 12
+source spec.sh 23
 
-Here the "12" is the number of segments to work through. Each segment takes several minutes to run. Wavelet denoting is used in the initial PSD estimation. A short MCMC is used to improve the spline and line model. This code is taken from QuickCBC and adapted for LISA. The script also makes Qscans of the whitened A, E channel data for each segment.
+Here the "23" is the number of segments to work through. Each segment takes several minutes to run. Wavelet denoting is used in the initial PSD estimation. A short MCMC is used to improve the spline and line model. This code is taken from QuickCBC and adapted for LISA. The script also makes Qscans of the whitened A, E channel data for each segment.
 
 The code SpecAverage.c is used to average and interpolate the PSD estimates from each segment to produce a PSD estimate for the full data set. Compile with
 
@@ -22,19 +22,19 @@ And run with
 
 [TODO - understand where the errant factors of 2 are in the FFT and spectral estimate for the full, padded data set are coming from]
 
-Next up is the search. This is invoked by calling the script
+Next up is the search. This is invoked by calling 
 
-source search.sh 1 1
+./search 3 3
 
-In the Sangria training data the first segment to include BH merger is number 1 (the numbering starts at 0). The arguments are the first and last segments searched. Here we are just searching segment 1 since the goal is to demonstrate how the code works, not repeat the entire analysis. To run the entire analysis type
+In the Sangria training data the first segment to include BH merger is number 3 (the numbering starts at 0). The arguments are the first and last segments searched. Here we are just searching segment 1 since the goal is to demonstrate how the code works, not repeat the entire analysis. To run the entire analysis type
 
-source search.sh 0 11
+source search.sh 0 22
 
 The search code reads in the FFTed data for a segment and the PSD model derived by the SpecFit code. The code makes Scans along the way to demonstrate the signal removal. Note that the initial Qscan differs a little from the one produced by the SpecFit code since the former uses the median/line PSD with the latter uses the spline, Lorentizian fit.
 
 The search code uses a PTMCMC and a maximized likelihood for each channel. It usually locks onto signals pretty quickly. For the first 1/8th of the intrinsic search, the code maximizes over time, phase and distance. For the rest of the intrinsic search it just maximizes over phase and distance, which is much faster (no FFTs). The next step is to find the sky location.
 
-The search makes multiple passes over each segment (up to some pre-set maximum). It has a stopping criterion based on the maximum log likelihood reached. Once it stops finding signals or runs up against the maximum number of sweeps it stops and moves on the the next segment. The code returns the residual for the segment and the best fit values for the source parameters for each signal found. The sky search uses an F-statistic likelihood and the full response with no heterodyning, so it is relatively slow (even though it is only using about one month of data). On my laptop, each sweep of the intrinsic search takes about 15 minutes and each sky search takes about 15 minutes. The current settings are pretty lean - designed for speed rather than depth.
+The search makes multiple passes over each segment (up to some pre-set maximum). It has a stopping criterion based on the maximum log likelihood reached. Once it stops finding signals or runs up against the maximum number of sweeps it stops and moves on the the next segment. The code returns the residual for the segment and the best fit values for the source parameters for each signal found. The sky search uses an F-statistic likelihood and the full response with no heterodyning, so it is relatively slow (even though it is only using about one month of data). On my laptop, each sweep of the search takes about 11 minutes for lower SNR signals and two or three times longer for high SNR signals since the number of iterations get increased for high SNR sources.
 
 Once all the segments have been searched we extract the unique signals with SNR > 12 using the code unique.c
 

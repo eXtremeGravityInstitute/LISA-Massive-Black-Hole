@@ -58,6 +58,8 @@
 /* Mass of the Sun (s) */
 #define Tsun 4.92569043916e-6
 
+#define MPC 3.08568025e22       // Megaparsec in meters
+
 #define h22fac  0.31539156525252   //  2.*sqrt(5./(64.*PI)) factor for h22 to h conversion
 
 #define STtoSQD 3282.8063500117437948  // steradians to square degree
@@ -107,7 +109,7 @@
 
 #define MF 4096
 
-/* set to 1 to run on LDC, 0 for a cataliog source */
+/* set to 1 to run on LDC, 0 for a catalog source */
 #define LDC 1
 
 /* set to 1 for noise level marginalization, 0 otherwise */

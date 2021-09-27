@@ -79,6 +79,7 @@ int main(int argc, char *argv[])
     double Tzero, beta;
     double **paramx;
     int ll, k, rep;
+    int st, se;
     char filename[1024];
 
     FILE *in;
@@ -105,21 +106,9 @@ int main(int argc, char *argv[])
     }
     //##############################################
     
-    if(argc<2)
-    {
-        printf("./search segment\n");
-        printf("segment numbers run from 0 to 12\n");
-        return 0;
-    }
-    
-    seg = atoi(argv[1]);
     dt = 5.0;
     N = 524288;
     Tobs = (double)(N)*dt;
-    // the merger for LDC Radler is in segment 9.
-    Tzero = (double)(seg)*Tobs;
-    
-    printf("%.0f %.0f %d\n", Tobs, Tzero, N);
 
     pmax = double_vector(NP);
     params = (double*)malloc(sizeof(double)*NP);
@@ -140,6 +129,23 @@ int main(int argc, char *argv[])
     SES = (double*)malloc(sizeof(double)* (N/2));
     
     paramx = double_matrix(NC,NP);
+    
+    if(argc<3)
+    {
+        printf("./search start_seg end_seg\n");
+        printf("segment numbers run from 0 to 22\n");
+        return 0;
+    }
+    
+    st = atoi(argv[1]);
+    se = atoi(argv[2]);
+    
+   for(seg=st; seg<= se; seg++)
+    {
+        
+    Tzero = (double)(seg)*Tobs/2.0;
+        
+    printf("%.0f %.0f %d\n", Tobs, Tzero, N);
     
     // Read in FFTed LDC data and A,E PSD from segmentAET.c
     sprintf(filename, "AET_seg%d_f.dat", seg);
@@ -184,8 +190,8 @@ int main(int argc, char *argv[])
      }
     fclose(out);
     
-       /* Used for testing against the PTMCMC code
-       sprintf(filename, "skymax_%d_%d.dat", seg, rep);
+       // Used for testing against the PTMCMC code
+       /*sprintf(filename, "skymax_%d_%d.dat", seg, rep);
        in = fopen(filename,"r");
        fscanf(in,"%lf", &x);
        for(i=0; i< NP; i++) fscanf(in,"%lf", &params[i]);
@@ -194,17 +200,17 @@ int main(int argc, char *argv[])
        printf("log L = %.12e\n", logL);
        return(0);
        */
+        
+        
     
     sprintf(filename, "Qscan_0_%d_%d.dat", seg, rep);
     qscanf(filename, AC, SA, Tobs, N);
     sprintf(filename, "Qscan_1_%d_%d.dat", seg, rep);
     qscanf(filename, EC, SE, Tobs, N);
+     
     
     do
     {
-        
-        
-        
         
       search(pmax, paramx, AC, EC, SN, SA, SE, Tobs, seg, N, rep);
     
@@ -214,18 +220,11 @@ int main(int argc, char *argv[])
         
     // [0] ln(Mc)  [1] ln(Mt)  [2] Spin1 [3] Spin2 [4] phic [5] tc [6] ln(distance)
     // [7] cos(EclipticCoLatitude), [8] EclipticLongitude  [9] polarization, [10] inclination
-  
-        
-     for (i=0; i< NC; i++)
-        {
-            for (j=0; j< NP; j++) paramx[i][j] = pmax[j];
-        }
         
      searchsky(pmax, paramx, AC, EC, SAS, SES, SA, SE, Tobs, seg, N, rep);
         
      logL = Likelihood(mtype, pmax, N, AC, EC, SA, SE, Tobs, Tzero);
         
-    
     // Remove the best fit signal
      ResponseFreq(mtype, pmax, N, AS, ES, Tobs, Tzero);
      for(i=0; i< N; i++)
@@ -260,6 +259,8 @@ int main(int argc, char *argv[])
            fprintf(out,"%e %e\n", AC[i], EC[i]);
      }
     fclose(out);
+        
+    }
     
     
     return 1;
@@ -313,9 +314,8 @@ void search(double *pmax,  double **paramx, double *AC, double *EC, double *SN, 
     history = double_tensor(NC,NH,NV);
     eval = double_matrix(NC,NV);
     evec = double_tensor(NC,NV,NV);
-
-
-    Tzero = (double)(seg)*Tobs;
+    
+    Tzero = (double)(seg)*Tobs/2.0;
     
     for (i=0; i< NC; i++) who[i] = i;
     heat[0] = 1.0;
@@ -344,7 +344,7 @@ void search(double *pmax,  double **paramx, double *AC, double *EC, double *SN, 
     max[2] = 0.95;
     max[3] = 0.95;
     max[4] = PI;
-    max[5] = Tzero+2.0*Tobs;  // merger could be up to 2 segments away
+    max[5] = Tzero+2.0*Tobs-buffer*Tobs;  // merger could be up to 2 segments away
     max[6] = log(1.0e3);
     max[7] = 10.0;
     max[8] = 2.0*PI;
@@ -352,29 +352,32 @@ void search(double *pmax,  double **paramx, double *AC, double *EC, double *SN, 
     max[10] = 1.0;
    
     min[0] = log(1.0e4);
-    min[1] = log(1.0e3);
+    min[1] = log(1.0e4);
     min[2] = -0.95;
     min[3] = -0.95;
     min[4] = 0.0;
-    min[5] = Tzero+1000.0;
+    min[5] = Tzero+buffer*Tobs;
     min[6] = log(0.1);
     min[7] = 0.1;
     min[8] = 0.0;
     min[9] = 0.0;
     min[10] = -1.0;
     
+    // [0] ln(Mass1)  [1] ln(Mass2)  [2] Spin1 [3] Spin2 [4] phic [5] tc [6] ln(distance)
+    // [7] E/A amplitude [8] PhaseA-PhaseE
+    
 
     for (i=0; i< NC; i++)
        {
-        
-               
+            
             for (j=0; j< NP; j++) paramx[i][j] = min[j]+(max[j]-min[j])*gsl_rng_uniform(r);
-              
+                    
              if(ll == 2)  // have to make sure the mass ratio is ok when using chirp,total mass
               {
                   
                do
                {
+                   
                flag = 0;
                for (j=0; j< 2; j++) paramx[i][j] = min[j]+(max[j]-min[j])*gsl_rng_uniform(r);
                // eta cannot exceed 0.25
@@ -384,8 +387,8 @@ void search(double *pmax,  double **paramx, double *AC, double *EC, double *SN, 
                {
                 if(paramx[i][j] > max[j] || paramx[i][j] < min[j]) flag = 1;
                }
-               }while(flag == 1);
-                  
+                   
+                }while(flag == 1);
               }
            
            logLx[i] = log_likelihood_max_dual(ll, AC, EC, paramx[i], SA, SE, N, Tobs, Tzero);
@@ -408,6 +411,7 @@ void search(double *pmax,  double **paramx, double *AC, double *EC, double *SN, 
          // effective SNR of 7 for hottest chain
          alpha = pow((2.0*logLmax/50.0),1.0/(double)(NC));
          if(alpha > 1.3) alpha = 1.3;
+         if(alpha < 1.0) alpha = 1.05;
          printf("reset alpha = %f\n", alpha);
          heat[0] = 1.0;
          for (i=1; i< NC; i++) heat[i] = heat[i-1]*alpha;
@@ -695,7 +699,6 @@ void update(int mc, int k, int ll, double *logLx, double **paramx, double **eval
     double *paramy;
     double a, b, c, leta;
 
-    
     paramy = double_vector(NP);
     
     q = who[k];
@@ -732,7 +735,6 @@ void update(int mc, int k, int ll, double *logLx, double **paramx, double **eval
     if(alpha > a ) // uniform draw
     {
         typ = 0;
-        
         
         for (j=0; j< NP; j++) paramy[j] = min[j]+(max[j]-min[j])*gsl_rng_uniform(r);
         
@@ -829,6 +831,10 @@ void update(int mc, int k, int ll, double *logLx, double **paramx, double **eval
         if(paramy[i] != paramy[i]) flag = 1; // crazier things have happened...
     }
     
+    x = (paramy[5]-Tzero)/Tobs;
+    if( fabs(x-rint(x)) < buffer ) flag = 1;  // keep merger away from boundaries
+
+    
     if(flag == 0)
      {
      if (mc < MS/8)  // time, phase and amplitude maximized
@@ -881,6 +887,65 @@ void de_jump(double *paramsx, double *paramsy, double **history, int m, int d, g
     
 }
 
+
+double findsky(int ll, double *params, double *min, double *max, double Tobs, double Tzero, int N,  double *AC, double *EC, double *SA, double *SE, gsl_rng *r)
+{
+    int i, j, k;
+   double logL, logLmax, x, ts, tref, alpha;
+   double *paramy, *pmax;
+    
+    pmax = double_vector(NP);
+    paramy = double_vector(NP);
+    
+    tref = params[5];
+    
+    // copy over parameters
+    for (j=0; j< NP; j++) paramy[j] = params[j];
+    
+    for (j=7; j< 9; j++) paramy[j] = min[j]+(max[j]-min[j])*gsl_rng_uniform(r);
+    for (j=0; j< NP; j++) pmax[j] = paramy[j];
+    
+    logLmax = -1.0;
+    
+    k = 0;
+    do
+    {
+        
+     paramy[6] = 0.0;
+     for (j=7; j< 9; j++) paramy[j] = min[j]+(max[j]-min[j])*gsl_rng_uniform(r);
+  
+     ts = Tmap(paramy, params[5]);
+     paramy[5] = params[5]-ts;
+    
+     x = (paramy[5]-Tzero)/Tobs;
+     logL = -100.0;
+        
+    if(fabs(x-rint(x)) > buffer)
+    {
+     logL = likelihoodFstatTmax(ll, paramy, N, AC, EC, SA, SE, Tobs, Tzero);
+    //logL = likelihoodFstat(ll, paramy, N, AC, EC, SA, SE, Tobs, Tzero);
+    }
+     
+    if(logL > logLmax)
+    {
+        logLmax = logL;
+        for (j=0; j< NP; j++) pmax[j] = paramy[j];
+    }
+        
+   // printf("%d %e %e\n", k, logL, logLmax);
+        
+    k++;
+        
+    }while(k < 10);
+    
+    for (j=0; j< NP; j++) params[j] = pmax[j];
+    
+    free_double_vector(paramy);
+    free_double_vector(pmax);
+    
+    return logLmax;
+    
+}
 
 // maps tc so that merger time at detector is held fixed
 double Tmap(double *params, double tdet)
@@ -946,7 +1011,6 @@ void searchsky(double *pmax, double **paramx, double *AC, double *EC, double *SA
     double *min, *max;
     int *scount, *sacc;
     double ***Fisher, **eval, ***evec;
-    double **paramy;
     int **av, **cv;
     int ll=mtype;
     int *who;
@@ -970,7 +1034,6 @@ void searchsky(double *pmax, double **paramx, double *AC, double *EC, double *SA
     sacc = int_vector(NC);
     scount = int_vector(NC);
     who = int_vector(NC);
-    paramy = double_matrix(NC,NP);
     max = double_vector(NP);
     min = double_vector(NP);
     heat = double_vector(NC);
@@ -982,8 +1045,7 @@ void searchsky(double *pmax, double **paramx, double *AC, double *EC, double *SA
     eval = double_matrix(NC,NP);
     evec = double_tensor(NC,NP,NP);
     
-     Tzero = (double)(seg)*Tobs;
-    
+    Tzero = (double)(seg)*Tobs/2.0;
     
     for (i=0; i< NC; i++) who[i] = i;
     // effective SNR of 7 for hottest chain
@@ -1014,7 +1076,7 @@ void searchsky(double *pmax, double **paramx, double *AC, double *EC, double *SA
     max[2] = 0.95;
     max[3] = 0.95;
     max[4] = PI;
-    max[5] = Tzero+2.0*Tobs;
+    max[5] = Tzero+2.0*Tobs-buffer*Tobs;
     max[6] = log(1.0e3);
     max[7] = 1.0;
     max[8] = 2.0*PI;
@@ -1022,37 +1084,24 @@ void searchsky(double *pmax, double **paramx, double *AC, double *EC, double *SA
     max[10] = 1.0;
    
     min[0] = log(1.0e4);
-    min[1] = log(1.0e3);
+    min[1] = log(1.0e4);
     min[2] = -0.95;
     min[3] = -0.95;
     min[4] = 0.0;
-    min[5] = Tzero+1000.0;
+    min[5] = Tzero+buffer*Tobs;
     min[6] = log(0.1);
     min[7] = -1.0;
     min[8] = 0.0;
     min[9] = 0.0;
     min[10] = -1.0;
     
-    // copy over parameters
-     for (i=0; i< NC; i++)
-     {
-         for (j=0; j< NP; j++) paramy[i][j] = paramx[i][j];
-     }
-
+    // [0] ln(Mass1)  [1] ln(Mass2)  [2] Spin1 [3] Spin2 [4] phic [5] tc [6] ln(distance)
+    // [7] cos(EclipticCoLatitude), [8] EclipticLongitude  [9] polarization, [10] inclination
     
-    for (i=0; i< NC; i++)
+     #pragma omp parallel for
+     for (i=0; i< NC; i++)
        {
-           k = 0;
-           do
-           {
-           for (j=7; j< 9; j++) paramx[i][j] = min[j]+(max[j]-min[j])*gsl_rng_uniform(r);
-           ts = Tmap(paramx[i], paramy[i][5]);
-           paramx[i][5] = paramy[i][5]-ts;
-           logLx[i] = likelihoodFstatTmax(ll, paramx[i], N, AC, EC, SA, SE, Tobs, Tzero);
-               k++;
-           }while(k < 10 && (paramx[i][5] > max[5] || paramx[i][5] < min[5]));
-           // some solutions might not have compatible merger times, clone to reference case
-           if(k == 10) for (j=0; j< NP; j++) paramx[i][j] = paramx[0][j];
+           logLx[i] = findsky(ll, paramx[i], min, max, Tobs, Tzero, N, AC, EC, SA, SE, rvec[i]);
        }
     
     sprintf(filename, "searchsky_%d_%d.dat", seg, rep);
@@ -1263,7 +1312,6 @@ void searchsky(double *pmax, double **paramx, double *AC, double *EC, double *SA
     free_double_tensor(Fisher,NC,NP);
     free_double_tensor(evec,NC,NP);
     free_double_matrix(eval,NC);
-    free_double_matrix(paramy,NC);
     free_int_vector(sacc);
     free_int_vector(scount);
     free_int_vector(who);
@@ -1292,7 +1340,7 @@ void updatesky(int mc, int k, int ll, double *logLx, double **paramx, double **e
     double *zv;
     
     paramy = double_vector(NP);
-    
+   
     q = who[k];
     
     for(i = 0; i < NP; i++) paramy[i] = paramx[q][i];
@@ -1420,6 +1468,9 @@ void updatesky(int mc, int k, int ll, double *logLx, double **paramx, double **e
            if(paramy[i] != paramy[i]) flag = 1; // crazier things have happened...
        }
     
+       x = (paramy[5]-Tzero)/Tobs;
+       if( fabs(x-rint(x)) < buffer ) flag = 1;  // keep merger away from boundaries
+    
       if(flag == 0)
       {
          logLy = likelihoodFstat(ll, paramy, N, AC, EC, SA, SE, Tobs, Tzero);
@@ -1449,6 +1500,7 @@ void updatesky(int mc, int k, int ll, double *logLx, double **paramx, double **e
      }
     
     free_double_vector(paramy);
+ 
     
 }
 
@@ -3135,7 +3187,7 @@ void SetUp(int ll, double *params, double fny, int NFmax, int *NFS, double *FF, 
         for (i=1; i< NF; i++) FF[i] = FF[i-1]+df;
     }
     
-    printf("%d %d\n", flag, NF);
+    //printf("%d %d\n", flag, NF);
     
 
     Intrinsic(ll, params, NF, FF, TF, PF, AF, Tobs, Tzero);
@@ -3366,7 +3418,7 @@ double log_likelihood_max_dual(int ll, double *A, double *E, double *params, dou
     double logL;
     double logLfs;
     double fmax;
-    double HA, HE, LD, dt, x;
+    double HA, HE, LD, dt, x, y, t;
     double normA, normE, deltH, pshiftA, pshiftE;
     double *AS, *ES;
     double *AC, *AF;
@@ -3405,18 +3457,33 @@ double log_likelihood_max_dual(int ll, double *A, double *E, double *params, dou
     for(i = 0; i < Nend/2; i++) ES[i+N/2] = sqrt(EC[i]*EC[i]+EF[i]*EF[i]);
     for(i = -Nend/2; i < 0; i++) ES[i+N/2] = sqrt(EC[N+i]*EC[N+i]+EF[N+i]*EF[N+i]);
     
-    x = 0;
+    x = 0.0;
+    k = 0;
     for (i = -Nend/2; i < Nend/2; ++i)
     {
-        if((AS[i+N/2]+ES[i+N/2]) > x)
+        j = i+N/2;
+        t = params[5]+(double)(i)*dt;
+        
+        y = (t-Tzero)/Tobs;
+        
+        if(fabs(y-rint(y)) > buffer)
         {
-            x = AS[i+N/2]+ES[i+N/2];
+         if((AS[j]+ES[j]) > x)
+         {
+            x = AS[j]+ES[j];
             k = i;
+         }
         }
     }
+        
+    HA = 0.0;
+    HE = 0.0;
     
-    HA = 2.0*(double)(N)*(AS[k+N/2]);
-    HE = 2.0*(double)(N)*(ES[k+N/2]);
+        if(x > 0.0)
+        {
+         HA = 2.0*(double)(N)*(AS[k+N/2]);
+         HE = 2.0*(double)(N)*(ES[k+N/2]);
+        }
     
     deltH = dt*(double)(k);
     
@@ -3602,11 +3669,165 @@ double likelihoodFstat(int ll, double *params, int N, double *AC, double *EC, do
     MM = double_matrix(4,4);
     MI = double_matrix(4,4);
     
-    for (i=0; i< NP; i++) pfilt[i] = params[i];
+    // [0] ln(Mass1)  [1] ln(Mass2)  [2] Spin1 [3] Spin2 [4] phic [5] tc [6] ln(distance)
+    // [7] EclipticCoLatitude, [8] EclipticLongitude  [9] polarization, [10] inclination
+
+    ResponseFstat(ll, params, N, filtA, filtE, Tobs, Tzero);
+    
+        for (i=0; i< 4; i++)
+        {
+            KV[i] = 2.0*(fourier_nwip(filtA[i], AC, SA, N) + fourier_nwip(filtE[i], EC, SE, N));
+            for (j=i; j< 4; j++)
+            {
+                MM[i][j] =  4.0*(fourier_nwip(filtA[i], filtA[j], SA, N) + fourier_nwip(filtE[i], filtE[j], SE, N));
+               
+            }
+        }
+        
+        for (i=0; i< 4; i++)
+        {
+            for (j=i; j< 4; j++)
+            {
+                MM[j][i] = MM[i][j];
+            }
+        }
+        
+        // a small stabilizer
+        for (i=0; i< 4; i++) MM[i][i] += 0.1;
+        
+        Inverse(MM, MI, 4);
+        
+        logL = 0.0;
+        
+        for (i=0; i< 4; i++)
+        {
+            aV[i] = 0.0;
+            for (j=0; j< 4; j++)
+            {
+                aV[i] += MI[i][j]*KV[j];
+                logL += 0.5*MI[i][j]*KV[i]*KV[j];
+            }
+        }
+    
+    x = (aV[0]+aV[3]);
+    x = x*x;
+    y = (aV[1]-aV[2]);
+    y = y*y;
+    u = (aV[0]-aV[3]);
+    u = u*u;
+    v = (aV[1]+aV[2]);
+    v = v*v;
+        
+        Ap = sqrt(x+y)+sqrt(u+v);
+        Ac = sqrt(x+y)-sqrt(u+v);
+        A = Ap + sqrt(Ap*Ap-Ac*Ac);
+        
+        x = atan2((aV[1]-aV[2]),(aV[0]+aV[3]));
+        
+        y = atan2(-(aV[1]+aV[2]),(aV[0]-aV[3]));
+        
+        psi = 0.25*(y-x);
+        while(psi < 0.0) psi += PI;
+        while(psi > PI) psi -= PI;
+        
+        
+        phic = 0.25*(x+y);
+        while(phic < 0.0) phic += PI;
+        while(phic > PI) phic -= PI;
+        
+        cosi = Ac/A;
+        
+        scale = 2.0/A;
+        
+
+      if(ll == 0)
+      {
+        params[6] *= scale;
+      }
+      else
+      {
+       params[6] += log(scale);
+      }
+    
+       params[10] = cosi;
+       params[9] = psi;
+       params[4] = phic;
+    
+    // catch failed maximization
+    if(params[6] != params[6] || params[4] != params[4] || params[9] != params[9] || params[10] != params[10]) logL = -1.0e20;
+
+    /*   Deallocate Arrays   */
+    
+     free(KV);
+     free(aV);
+     free_double_matrix(MM,4);
+     free_double_matrix(MI,4);
+     free_double_matrix(filtA,4);
+     free_double_matrix(filtE,4);
+    
+    
+    return logL;
+}
+
+double likelihoodFstatOld(int ll, double *params, int N, double *AC, double *EC, double *SA, double *SE, double Tobs, double Tzero)
+{
+    
+    /*   Indicies   */
+    int i,j, k, n, m, imax;
+    
+    /*   Miscellaneous  */
+    double xm, fstep, power, om, mx, tx;
+    
+    double *pfilt;
+    
+    double **filtA, **filtE;
+    
+    double **MM, **MI;
+    
+    double *KV, *aV;
+    
+    double AR, AI, ER, EI;
+    
+    double t, f, kdotx, Amp, Phase, Fp, Fc;
+    
+    double A, P, px, tc, tcs, pxi, pxj;
+    
+    double x, y, u, v, xold, yold;
+    
+    double cp, sp;
+    
+    int NA, flag;
+    
+    double cx, sx, logL, logLmax;
+    
+    int nn;
+    
+    double iota, cosi;
+    double Ap, Ac, scale;
+    
+    double a1, a2, a3, a4;
+    double cpsi, spsi;
+    double psi, phic;
+    double cpc, spc;
+    
+    FILE *out;
+    
+    pfilt = (double*)malloc(sizeof(double)* (NP));
+    
+    filtA = double_matrix(4,N);
+    filtE = double_matrix(4,N);
+    
+    KV = (double*)malloc(sizeof(double)* (4));
+    aV = (double*)malloc(sizeof(double)* (4));
+    MM = double_matrix(4,4);
+    MI = double_matrix(4,4);
     
     // [0] ln(Mass1)  [1] ln(Mass2)  [2] Spin1 [3] Spin2 [4] phic [5] tc [6] ln(distance)
-       // [7] EclipticCoLatitude, [8] EclipticLongitude  [9] polarization, [10] inclination
+    // [7] EclipticCoLatitude, [8] EclipticLongitude  [9] polarization, [10] inclination
     
+    
+    for (i=0; i< NP; i++) pfilt[i] = params[i];
+
     pfilt[10] = 0.0;
     
     pfilt[4] = 0.0;
@@ -3624,7 +3845,7 @@ double likelihoodFstat(int ll, double *params, int N, double *AC, double *EC, do
     pfilt[4] = PI/4.0;
     pfilt[9] = PI/4.0;
     ResponseFreq(ll, pfilt, N, filtA[3], filtE[3], Tobs, Tzero);
-    
+     
     
         for (i=0; i< 4; i++)
         {
@@ -3756,7 +3977,7 @@ double likelihoodFstatTmax(int ll, double *params, int N, double *AC, double *EC
     
     double cx, sx, logL, logLmax;
     
-    double delT = 20.0;
+    double delT = 50.0;
     
     int nn;
     
@@ -3785,28 +4006,13 @@ double likelihoodFstatTmax(int ll, double *params, int N, double *AC, double *EC
     MM = double_matrix(4,4);
     MI = double_matrix(4,4);
     
-    for (i=0; i< NP; i++) pfilt[i] = params[i];
+   
     
     // [0] ln(Mass1)  [1] ln(Mass2)  [2] Spin1 [3] Spin2 [4] phic [5] tc [6] ln(distance)
        // [7] EclipticCoLatitude, [8] EclipticLongitude  [9] polarization, [10] inclination
     
-    pfilt[10] = 0.0;
-    
-    pfilt[4] = 0.0;
-    pfilt[9] = 0.0;
-    ResponseFreq(ll, pfilt, N, filtA[0], filtE[0], Tobs, Tzero);
-    
-    pfilt[4] = PI/2.0;
-    pfilt[9] = PI/4.0;
-    ResponseFreq(ll, pfilt, N, filtA[1], filtE[1], Tobs, Tzero);
-    
-    pfilt[4] = 3.0*PI/4.0;
-    pfilt[9] = 0.0;
-    ResponseFreq(ll, pfilt, N, filtA[2], filtE[2], Tobs, Tzero);
-    
-    pfilt[4] = PI/4.0;
-    pfilt[9] = PI/4.0;
-    ResponseFreq(ll, pfilt, N, filtA[3], filtE[3], Tobs, Tzero);
+
+    ResponseFstat(ll, params, N, filtA, filtE, Tobs, Tzero);
     
    //printf("\n");
         for (i=0; i< 4; i++)
@@ -3863,7 +4069,7 @@ double likelihoodFstatTmax(int ll, double *params, int N, double *AC, double *EC
     
     dtx = -b/(2.0*a);
                         
-   // printf("%f\n", dtx);
+    //printf("%f\n", dtx);
     
     // This method is not well define for shifts of more than a few delT
     if(dtx < -2.0*delT) dtx = -2.0*delT;
@@ -3994,6 +4200,8 @@ double Likelihood(int ll, double *params, long N, double *AD, double *ED, double
     return(logL);
     
 }
+
+
 
 
 void ResponseFreq(int ll, double *params, long N, double *AS, double *ES, double Tobs, double Tzero)
@@ -4270,8 +4478,8 @@ void ResponseFreq(int ll, double *params, long N, double *AS, double *ES, double
             Amp = x*AF[m];
             Phase = ap->phase[m]+2.0*phic;
             
-            HC = Amp*cos(2.0*PI*f*(Tobs-tc+dt/2.0-kdotx)-Phase);
-            HS = Amp*sin(2.0*PI*f*(Tobs-tc+dt/2.0-kdotx)-Phase);
+            HC = Amp*cos(2.0*PI*f*(Tend-tc+dt/2.0-kdotx)-Phase);
+            HS = Amp*sin(2.0*PI*f*(Tend-tc+dt/2.0-kdotx)-Phase);
             
 
             AS[n] = FpAR[m]*Aplus*HC - FpAI[m]*Aplus*HS - FcAR[m]*Across*HS - FcAI[m]*Across*HC;
@@ -4308,6 +4516,332 @@ void ResponseFreq(int ll, double *params, long N, double *AS, double *ES, double
     
     return;
 }
+
+void ResponseFstat(int ll, double *params, long N, double **AS, double **ES, double Tobs, double Tzero)
+{
+    
+    /*   Indicies   */
+    int i,j, k, ii, n, m, a, M, nn, nmin, nmax;
+    
+    /*   GW Source data   */
+    double Mc, theta, phi, psi, D, iota, A, Aplus, Across, f0, fdot, phio;
+    double costh, sinth, cosph, sinph, cosi, cosps, sinps;
+    
+    /*   Time and distance variables   */
+    double xi, t, Tend, told, tx;
+    
+    /*   Miscellaneous  */
+    double xm, fstep, power, om, mx, x;
+    
+    double Amp, Phase, fonfs, f;
+    
+    double Aprime, Pprime, fi;
+    
+    double HC, HS, hp, hc;
+    
+    double m1, m2, chi1, chi2, phic, tc, distance, dm, Mtot, eta, fr, af;
+    
+    double *ta, *xia, *FF;
+    
+    double Fp, Fc, kdotx, delt, fmin, fmax, dt;
+    
+    double XR, XI, YR, YI, ZR, ZI;
+    
+    int nfmin, nfmax, nf, flag;
+    
+    int NA;
+    
+    double fstart, fstop, fny;
+    
+    double m1_SI, m2_SI, deltaF;
+    
+     double fx, sqrtTobs;
+    
+    double *pfstat;
+    
+ 
+    double *FpAR, *FpAI, *FcAR, *FcAI;
+    double *FpER, *FpEI, *FcER, *FcEI;
+    
+    FILE *out;
+    
+    dt = Tobs/(double)(N);
+    fny = 1.0/(2.0*dt);
+    Tend = Tzero+Tobs;
+    sqrtTobs = sqrt(Tobs);
+    
+    if(ll == 0)  // linear in m1, m2, DL
+    {
+    m1 = params[0]*TSUN;    // Mass1
+    m2 = params[1]*TSUN;    // Mass2
+    distance = params[6]*1.0e9*PC_SI; // distance
+    Mtot = (m1+m2);
+    eta = m1*m2/((m1+m2)*(m1+m2));
+    Mc = pow(m1*m2,3.0/5.0)/pow(m1+m2,1.0/5.0);
+    }
+    else if(ll == 1)  // log in m1, m2, DL
+    {
+     m1 = exp(params[0])*TSUN;    // Mass1
+     m2 = exp(params[1])*TSUN;    // Mass2
+     distance = exp(params[6])*1.0e9*PC_SI; // distance
+     Mtot = (m1+m2);
+     eta = m1*m2/((m1+m2)*(m1+m2));
+     Mc = pow(m1*m2,3.0/5.0)/pow(m1+m2,1.0/5.0);
+    }
+    else // log in Mc, Mt, DL
+    {
+    distance = exp(params[6])*1.0e9*PC_SI; // distance
+    Mc = exp(params[0])*TSUN;
+    Mtot = exp(params[1])*TSUN;
+    eta = pow((Mc/Mtot), (5.0/3.0));
+     if(eta > 0.25)
+     {
+        dm = 0.0;
+     }
+     else
+     {
+        dm = sqrt(1.0-4.0*eta);
+     }
+    m1 = Mtot*(1.0+dm)/2.0;
+    m2 = Mtot*(1.0-dm)/2.0;
+    }
+    
+    //printf("%e %e %e\n", m1, m2, Mtot);
+    
+    m1_SI = m1*MSUN_SI/TSUN;
+    m2_SI = m2*MSUN_SI/TSUN;
+    
+    chi1 = params[2];  // Spin1
+    chi2 = params[3];  // Spin2
+    tc = params[5];    // merger time
+
+    AmpPhaseFDWaveform *ap = NULL;
+    double fRef_in=PDfref;
+    double *AF, *TF;
+    int ret, flag1, flag2;
+    
+    AF = (double*)malloc(sizeof(double)* (N/2));
+    TF = (double*)malloc(sizeof(double)* (N/2));
+    
+    StartStop(ll, params, Tobs, Tzero, Tend, &fstart, &fstop, &fr);
+    
+    if(fstop > fny) fstop = fny;
+    
+    //printf("%.15e %e %e\n", fstart, fstop, fr);
+    
+    nfmin = (int)(fstart*Tobs);
+    if(nfmin < 1) nfmin = 1;
+    nfmax = (int)(fstop*Tobs);
+    if(nfmax <= nfmin) nfmax = nfmin+1;
+    if(nfmax > N/2) nfmax = N/2;
+    nf = nfmax-nfmin;
+    
+    if(nf < 1)
+    {
+        nf = 1;
+        if(nfmax < 2)
+        {
+            nfmin = 1;
+            nfmax = 2;
+        }
+        if(nfmax == N/2)
+        {
+            nfmin = N/2-1;
+        }
+    }
+    
+    fmin = (double)(nfmin)/Tobs;
+    fmax = (double)(nfmax)/Tobs;
+    
+    deltaF = 1.0/Tobs;
+    
+    //printf("%e %e %d %ld\n", fmin, fmax, nfmin, nf);
+    
+    
+    ta = (double*)malloc(sizeof(double)* (nf));
+    xia = (double*)malloc(sizeof(double)* (nf));
+    FpAR = (double*)malloc(sizeof(double)* (nf));
+    FcAR = (double*)malloc(sizeof(double)* (nf));
+    FpER = (double*)malloc(sizeof(double)* (nf));
+    FcER = (double*)malloc(sizeof(double)* (nf));
+    FpAI = (double*)malloc(sizeof(double)* (nf));
+    FcAI = (double*)malloc(sizeof(double)* (nf));
+    FpEI = (double*)malloc(sizeof(double)* (nf));
+    FcEI = (double*)malloc(sizeof(double)* (nf));
+    FF = (double*)malloc(sizeof(double)* (nf));
+    
+    RealVector *freq;
+    freq = CreateRealVector(nf);
+    for (i=0; i< nf; i++) freq->data[i] = fmin+(double)(i)*deltaF;
+    for (i=0; i< nf; i++) FF[i] = freq->data[i];
+    
+    if(distance != distance) printf("distance nan %e\n", params[6]);
+    if(distance <= 0.0) printf("<= 0 %e\n", params[6]);
+    
+    ret = IMRPhenomDGenerateh22FDAmpPhase(
+                                          &ap,      /**< [out] FD waveform */
+                                          freq, /**< Input: frequencies (Hz) on which to evaluate h22 FD - will be copied in the output AmpPhaseFDWaveform. Frequencies exceeding max freq covered by PhenomD will be given 0 amplitude and phase. */
+                                          0.0,                  /**< Orbital phase at fRef (rad) */
+                                          fRef_in,               /**< reference frequency (Hz) */
+                                          m1_SI,                 /**< Mass of companion 1 (kg) */
+                                          m2_SI,                 /**< Mass of companion 2 (kg) */
+                                          chi1,                  /**< Aligned-spin parameter of companion 1 */
+                                          chi2,                  /**< Aligned-spin parameter of companion 2 */
+                                          distance               /**< Distance of source (m) */
+                                          );
+    
+    //end = clock();
+    //cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+    //printf("PhenomD call took %f seconds\n", cpu_time_used);
+    
+    // start = clock();
+    
+    
+    // fill the Time - Frequency series
+    
+    flag = 0;
+    told = ap->time[0]+tc;
+    
+    for (i=0; i< nf; i++)
+    {
+        t = ap->time[i]+tc;
+        
+        if(t < told && flag == 0)
+        {
+            flag = 1;
+            ii = i-1;
+            tx = told;
+            fx = freq->data[ii];
+        }
+        
+        TF[i] = t;
+        if(flag == 1) TF[i] = tx + (freq->data[i]-fx)/fr*Mtot;
+        told = t;
+    }
+    
+
+    //   phic = params[4];  // merger phase
+    //   cosi = params[10];  // inclination
+    
+    RAFstat(params, nf, TF, FF, xia, FpAR, FpAI, FcAR, FcAI, FpER, FpEI, FcER, FcEI);
+    
+    Aplus = 0.5;
+    Across = 0.0;
+    
+    for (i=0; i< nf; i++)
+    {
+        AF[i] =  h22fac*ap->amp[i]/sqrtTobs;
+        fonfs = freq->data[i]/fstar;
+        AF[i] *= (4.0*fonfs*sin(fonfs));   // conversion to fractional frequency and leading order TDI transfer function
+    }
+    
+     for (i=0; i< 4; i++)
+      {
+      for(n=0; n< N; n++)
+      {
+        AS[i][n] = 0.0;
+        ES[i][n] = 0.0;
+      }
+     }
+    
+    /*   Main Loop   */
+    
+    
+    nn = 0;
+    for(n=nfmin; n< nfmax; n++)
+    {
+        // Barycenter time and frequency
+        
+        // The frequency and time arrays start at nfmin
+        m = n-nfmin;
+        
+        if(m > -1 && m < nf)
+        {
+            t = TF[m];
+            f = FF[m];
+            xi = xia[m];
+            
+            kdotx = t-xi;
+            
+            // Tukey filter to match what is done in time domain
+            x = 1.0;
+            if(t < Tzero+t_tuke) x = 0.5*(1.0+cos(PI*((t-Tzero)/t_tuke-1.0)));
+            if(t > Tend-t_tuke && t < Tend)
+            {
+            x = 0.5*(1.0-cos(PI*(t-Tend)/t_tuke));
+            }
+            if(t > Tend) x = 0.0;
+            
+            Amp = x*AF[m];
+            Phase = ap->phase[m];
+        
+            HC = Amp*cos(2.0*PI*f*(Tend-tc+dt/2.0-kdotx)-Phase);
+            HS = Amp*sin(2.0*PI*f*(Tend-tc+dt/2.0-kdotx)-Phase);
+            
+           // The cosps = 0, sinps = 1 case is the same as the cosps = 1, sinps = 0 case with fp(01) = fc(10) amd fc(01) = -fp(10)
+            
+                   // 1 0  HC -> HC, HS -> HS
+                 
+                   AS[0][n] = FpAR[m]*Aplus*HC - FpAI[m]*Aplus*HS;
+                   AS[0][N-n] = FpAI[m]*Aplus*HC + FpAR[m]*Aplus*HS;
+             
+                   ES[0][n] = FpER[m]*Aplus*HC - FpEI[m]*Aplus*HS;
+                   ES[0][N-n] = FpEI[m]*Aplus*HC + FpER[m]*Aplus*HS;
+                 
+                 // 0 1    HC -> -HC, HS -> -HS
+                 
+                   AS[1][n] = -FcAR[m]*Aplus*HC + FcAI[m]*Aplus*HS;
+                   AS[1][N-n] = -FcAI[m]*Aplus*HC - FcAR[m]*Aplus*HS;
+             
+                   ES[1][n] = -FcER[m]*Aplus*HC + FcEI[m]*Aplus*HS;
+                   ES[1][N-n] = -FcEI[m]*Aplus*HC - FcER[m]*Aplus*HS;
+             
+
+                 // 1 0   HC -> -HS, HS -> HC
+            
+                    AS[2][n] = -FpAR[m]*Aplus*HS - FpAI[m]*Aplus*HC;
+                    AS[2][N-n] = -FpAI[m]*Aplus*HS + FpAR[m]*Aplus*HC;
+                         
+                    ES[2][n] = -FpER[m]*Aplus*HS - FpEI[m]*Aplus*HC;
+                    ES[2][N-n] = -FpEI[m]*Aplus*HS + FpER[m]*Aplus*HC;
+             
+                 // 0 1    HC -> HS, HS -> -HC
+            
+                     AS[3][n] = FcAR[m]*Aplus*HS + FcAI[m]*Aplus*HC;
+                     AS[3][N-n] = FcAI[m]*Aplus*HS - FcAR[m]*Aplus*HC;
+                        
+                     ES[3][n] = FcER[m]*Aplus*HS + FcEI[m]*Aplus*HC;
+                     ES[3][N-n] = FcEI[m]*Aplus*HS - FcER[m]*Aplus*HC;
+            
+            
+        }
+        
+        
+    }
+    
+    /*   Deallocate Arrays   */
+    
+    free(AF);
+    free(TF);
+    
+    free(ta);
+    free(xia);
+    free(FcAR);
+    free(FpAR);
+    free(FcER);
+    free(FpER);
+    free(FcAI);
+    free(FpAI);
+    free(FcEI);
+    free(FpEI);
+    free(FF);
+    
+    DestroyAmpPhaseFDWaveform(ap);
+    DestroyRealVector(freq);
+    
+    return;
+}
+
 
 
 void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, double *FpAR, double *FpAI, double *FcAR, double *FcAI,
@@ -4546,6 +5080,249 @@ void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, doubl
         FpEI[n] = (fpx-2*fpy+fpz)*0.408248290463863;
         FcEI[n] = (fcx-2*fcy+fcz)*0.408248290463863;
 
+        
+    }
+    
+    free_double_vector(u); free_double_vector(v); free_double_vector(kv);
+    
+    free_double_matrix(eplus,4); free_double_matrix(ecross,4);
+    
+    free_double_matrix(dplus,4); free_double_matrix(dcross,4);
+    
+    free_double_matrix(TR,4); free_double_matrix(TI,4);
+    
+    free_double_matrix(kdr,4);
+    
+    free_double_vector(kdg);
+    
+    free_double_vector(x); free_double_vector(y); free_double_vector(z);
+    
+    free_double_vector(r12); free_double_vector(r21); free_double_vector(r31);
+    free_double_vector(r13); free_double_vector(r23); free_double_vector(r32);
+    free_double_vector(r10); free_double_vector(r20); free_double_vector(r30);
+    
+    return;
+}
+
+void RAFstat(double *params, int NF, double *TF, double *FF, double *xi, double *FpAR, double *FpAI, double *FcAR, double *FcAI, double *FpER, double *FpEI, double *FcER, double *FcEI)
+{
+    
+    /*   Indicies   */
+    int i,j, k, n, m, a, M;
+    
+    /*   Gravitational Wave basis vectors   */
+    double *u,*v,*kv;
+    
+    /*   Polarization basis tensors   */
+    double **eplus, **ecross;
+    
+    /*   Spacecraft position and separation vector   */
+    double *x, *y, *z;
+    double *r12, *r13, *r21, *r23, *r31, *r32;
+    double *r10, *r20, *r30;
+    double *vx, *vy, *vz;
+    
+    double q1, q2, q3, q4;
+    
+    /*   Dot products   */
+    double kdotx;
+    
+    /*   Convenient quantities   */
+    double **dplus, **dcross;
+    
+    /*   GW Source data   */
+    double Mc, theta, phi, psi, D, iota, A, Aplus, Across, f0, fdot, phio;
+    double costh, sinth, cosph, sinph, cosi, cosps, sinps;
+    
+    /*   Time and distance variables   */
+    double t, xa, ya, za;
+    
+    /*   Miscellaneous  */
+    double xm, fstep, power, om, mx;
+    
+    double delt;
+    
+    double fpx, fcx, fpy, fcy, fpz, fcz;
+    
+    double **TR, **TI, **kdr;
+    
+    double *kdg;
+    
+    double fr;
+    
+    /*   Allocating Arrays   */
+    
+    u = double_vector(4); v = double_vector(4); kv = double_vector(4);
+    
+    eplus  = double_matrix(4,4); ecross = double_matrix(4,4);
+    
+    dplus  = double_matrix(4,4); dcross = double_matrix(4,4);
+    
+    TR  = double_matrix(4,4); TI = double_matrix(4,4);
+    
+    kdr = double_matrix(4,4);
+    
+    kdg = double_vector(4);
+    
+    x = double_vector(4); y = double_vector(4); z = double_vector(4);
+    
+    r12 = double_vector(4); r21 = double_vector(4); r31 = double_vector(4);
+    r13 = double_vector(4); r23 = double_vector(4); r32 = double_vector(4);
+    r10 = double_vector(4); r20 = double_vector(4); r30 = double_vector(4);
+    
+    phi = params[8];   // EclipticLongitude
+    psi = params[9];   // polarization
+    //Calculate cos and sin of sky position, inclination, polarization
+    costh = params[7];   sinth = sqrt(1.0-costh*costh);
+    cosph = cos(phi);     sinph = sin(phi);
+    
+    
+    /*   Tensor basis  */
+    v[1] =  -costh*cosph;
+    v[2] =  -costh*sinph;
+    v[3] = sinth;
+    
+    u[1] =  sinph;
+    u[2] = -cosph;
+    u[3] =  0.;
+    
+    
+    kv[1] = -sinth*cosph;
+    kv[2] = -sinth*sinph;
+    kv[3] = -costh;
+    
+    
+    
+    for(i=1;i<=3;i++)
+    {
+        for(j=1;j<=3;j++)
+        {
+            eplus[i][j]  = u[i]*u[j] - v[i]*v[j];
+            ecross[i][j] = u[i]*v[j] + v[i]*u[j];
+        }
+    }
+    
+    /*   Main Loop   */
+    for(n=0; n< NF; n++)
+    {
+        // Barycenter time
+        t = TF[n];
+        fr = FF[n]/(2.0*fstar);
+        
+        spacecraft(t, x, y, z);
+        
+        // guiding center
+        xa = (x[1]+x[2]+x[3])/3.0;
+        ya = (y[1]+y[2]+y[3])/3.0;
+        za = (z[1]+z[2]+z[3])/3.0;
+        
+        kdotx = (xa*kv[1]+ya*kv[2]+za*kv[3])/clight;
+        
+        // detector time and frequency
+        xi[n]  = t - kdotx;
+        
+        //Unit separation vector from spacecraft i to j
+        r12[1] = (x[2] - x[1])/Larm;   r13[1] = (x[3] - x[1])/Larm;   r23[1] = (x[3] - x[2])/Larm;
+        r12[2] = (y[2] - y[1])/Larm;   r13[2] = (y[3] - y[1])/Larm;   r23[2] = (y[3] - y[2])/Larm;
+        r12[3] = (z[2] - z[1])/Larm;   r13[3] = (z[3] - z[1])/Larm;   r23[3] = (z[3] - z[2])/Larm;
+        
+        // These are not unit vectors. Just pulling out the Larm scaling
+        r10[1] = (xa-x[1])/Larm;   r10[2] = (ya-y[1])/Larm;  r10[3] = (za-z[1])/Larm;
+        r20[1] = (xa-x[2])/Larm;   r20[2] = (ya-y[2])/Larm;  r20[3] = (za-z[2])/Larm;
+        r30[1] = (xa-x[3])/Larm;   r30[2] = (ya-y[3])/Larm;  r30[3] = (za-z[3])/Larm;
+        
+        kdr[1][2] = 0.0;
+        for(k=1; k<=3; k++) kdr[1][2] += kv[k]*r12[k];
+        kdr[1][3] = 0.0;
+        for(k=1; k<=3; k++) kdr[1][3] += kv[k]*r13[k];
+        kdr[2][3] = 0.0;
+        for(k=1; k<=3; k++) kdr[2][3] += kv[k]*r23[k];
+        
+        kdr[2][1] = -kdr[1][2];  kdr[3][1] = -kdr[1][3];  kdr[3][2] = -kdr[2][3];
+        
+        kdg[1] = 0.0;
+        for(k=1; k<=3; k++) kdg[1] += kv[k]*r10[k];
+        kdg[2] = 0.0;
+        for(k=1; k<=3; k++) kdg[2] += kv[k]*r20[k];
+        kdg[3] = 0.0;
+        for(k=1; k<=3; k++) kdg[3] += kv[k]*r30[k];
+        
+        //Make use of symmetry
+        for(i=1; i<=3; i++)
+        {
+            r21[i] = -r12[i];
+            r31[i] = -r13[i];
+            r32[i] = -r23[i];
+        }
+        
+        
+        for(i=1; i<=3; i++)
+        {
+            for(j=1; j<=3; j++)
+            {
+                q1 = fr*(1.0-kdr[i][j]);
+                q2 = fr*(1.0+kdr[i][j]);
+                q3 = -fr*(3.0+kdr[i][j]-2.0*kdg[i]);
+                q4 = -fr*(1.0+kdr[i][j]-2.0*kdg[i]);
+                q1 = (sin(q1)/q1);
+                q2 = (sin(q2)/q2);
+                TR[i][j] = 0.5*(q1*cos(q3)+q2*cos(q4));   // goes to 1 when f/fstat small
+                TI[i][j] = 0.5*(q1*sin(q3)+q2*sin(q4));   // goes to 0 when f/fstat small
+            }
+        }
+        
+
+        
+        dplus[1][2] = dplus[1][3] = dplus[2][1] = dplus[2][3] = dplus[3][1] = dplus[3][2] = 0.;
+        dcross[1][2] = dcross[1][3] = dcross[2][1] = dcross[2][3] = dcross[3][1] = dcross[3][2] = 0.;
+        //Convenient quantities d+ & dx
+        for(i=1; i<=3; i++)
+        {
+            for(j=1; j<=3; j++)
+            {
+                dplus[1][2]  += r12[i]*r12[j]*eplus[i][j];   dcross[1][2] += r12[i]*r12[j]*ecross[i][j];
+                dplus[2][3]  += r23[i]*r23[j]*eplus[i][j];   dcross[2][3] += r23[i]*r23[j]*ecross[i][j];
+                dplus[1][3]  += r13[i]*r13[j]*eplus[i][j];   dcross[1][3] += r13[i]*r13[j]*ecross[i][j];
+            }
+        }
+        
+        dplus[2][1] = dplus[1][2];  dcross[2][1] = dcross[1][2];
+        dplus[3][2] = dplus[2][3];  dcross[3][2] = dcross[2][3];
+        dplus[3][1] = dplus[1][3];  dcross[3][1] = dcross[1][3];
+        
+        //cosps = 1, sinps = 0
+        
+        // The cosps = 0, sinps = 1 case is the same as the cosps = 1, sinps = 0 case with fp(01) = fc(10) amd fc(01) = -fp(10)
+        
+        fpx = -0.5*( dplus[1][2]*TR[1][2] - dplus[1][3]*TR[1][3] );
+        fcx = -0.5*( dcross[1][2]*TR[1][2] - dcross[1][3]*TR[1][3] );
+        
+        fpy = -0.5*(dplus[2][3]*TR[2][3] - dplus[2][1]*TR[2][1] );
+        fcy = -0.5*( dcross[2][3]*TR[2][3] - dcross[2][1]*TR[2][1] );
+        
+        fpz = -0.5*(dplus[3][1]*TR[3][1] - dplus[3][2]*TR[3][2] );
+        fcz = -0.5*( dcross[3][1]*TR[3][1] - dcross[3][2]*TR[3][2] );
+        
+        FpAR[n] = (2.0*fpx-fpy-fpz)/3.0;
+        FcAR[n] = (2.0*fcx-fcy-fcz)/3.0;
+               
+        FpER[n] = (fpz-fpy)/sq3;
+        FcER[n] = (fcz-fcy)/sq3;
+        
+        fpx = -0.5*( dplus[1][2]*TI[1][2] - dplus[1][3]*TI[1][3] );
+        fcx = -0.5*( dcross[1][2]*TI[1][2] - dcross[1][3]*TI[1][3] );
+        
+        fpy = -0.5*(dplus[2][3]*TI[2][3] - dplus[2][1]*TI[2][1] );
+        fcy = -0.5*( dcross[2][3]*TI[2][3] - dcross[2][1]*TI[2][1] );
+        
+        fpz = -0.5*(dplus[3][1]*TI[3][1] - dplus[3][2]*TI[3][2] );
+        fcz = -0.5*( dcross[3][1]*TI[3][1] - dcross[3][2]*TI[3][2] );
+                                                                                     
+        FpAI[n] = (2.0*fpx-fpy-fpz)/3.0;
+        FcAI[n] = (2.0*fcx-fcy-fcz)/3.0;
+                                                                                     
+        FpEI[n] = (fpz-fpy)/sq3;
+        FcEI[n] = (fcz-fcy)/sq3;
         
     }
     

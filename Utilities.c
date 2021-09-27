@@ -152,10 +152,11 @@ void specest(double *data, double *Hf, int N, int Ns, double dt, double fmx, dou
     
     gsl_fft_real_radix2_transform(D, 1, N);
     
+    fac = Tobs/((double)(N)*(double)(N));
+
+    
     // Form spectral model for whitening data (lines plus a smooth component)
     spectrum(D, Sn, specD, sspecD, df, N);
-    
-    fac = Tobs/((double)(N)*(double)(N));
     
     for (i = 0; i < Ns; ++i) SM[i] = sspecD[i]*fac;
     for (i = 0; i < Ns; ++i) SN[i] = specD[i]*fac;
@@ -237,7 +238,7 @@ void clean(double *D, double *Draw, double *Hf, double *sqf, double *freqs, doub
     double **live;
     double **live2;
     
-    double *Dtemp, *Drf;
+    double *Dtemp, *Drf, *Dprint;
     
     FILE *out;
     
@@ -269,6 +270,17 @@ void clean(double *D, double *Draw, double *Hf, double *sqf, double *freqs, doub
     gsl_fft_real_radix2_transform(D, 1, N);
     gsl_fft_real_radix2_transform(Dtemp, 1, N);
     
+    if(pflag == 1)
+    {
+    out = fopen("spec_raw.dat","w");
+    fac = Tobs/((double)(N)*(double)(N));
+    for(i=1; i< N/2; i++)
+    {
+        fprintf(out,"%e %e\n", (double)(i)/Tobs, 2.0*fac*(Dtemp[i]*Dtemp[i]+Dtemp[N-i]*Dtemp[N-i]));
+    }
+    fclose(out);
+    }
+    
     // remove the CBC signal if provided (in the spec code this is zero)
     for(i = 0; i < N; i++)
     {
@@ -279,15 +291,37 @@ void clean(double *D, double *Draw, double *Hf, double *sqf, double *freqs, doub
     // Form spectral model for whitening data (lines plus a smooth component)
     spectrum(D, Sn, specD, sspecD, df, N);
     
+    if(pflag == 1)
+       {
+            Dprint = (double*)malloc(sizeof(double)*(N));
+            for (i = 0; i < N; i++) Dprint[i] = D[i];
+            // whiten data
+            whiten(Dprint, specD, N);
+            // Wavelet transform
+            TransformC(Dprint, freqs, tfD, tfDR, tfDI, Q, Tobs, N, Nf);
+            free(Dprint);
+            out = fopen("Qclean.dat","w");
+            for(j = 0; j < Nf; j+=2)
+              {
+                 f = freqs[j];
+                  for(i = 0; i < N; i+=16)
+                  {
+                    t = (double)(i)*dt;
+                    fprintf(out,"%e %e %e\n", t, f, tfD[j][i]);
+                  }
+                fprintf(out,"\n");
+              }
+            fclose(out);
+       }
+    
     // whiten data
     whiten(Dtemp, specD, N);
-    
     // Wavelet transform
     TransformC(Dtemp, freqs, tfD, tfDR, tfDI, Q, Tobs, N, Nf);
     
     if(pflag == 1)
     {
-        out = fopen("Qtransform.dat","w");
+        out = fopen("Qdata.dat","w");
         for(j = 0; j < Nf; j+=2)
         {
             f = freqs[j];

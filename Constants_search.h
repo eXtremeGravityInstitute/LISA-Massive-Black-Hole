@@ -76,11 +76,14 @@
 /* length of cosine filter used to cut data */
 #define t_tuke 5.0e4
 
+/* keep merger time away from segement boundaries */
+#define buffer 0.1
+
 #define Tpad 1000.0
 
 #define MS 1000
 
-#define MSS 500
+#define MSS 200
 
 #define NH 100
 
