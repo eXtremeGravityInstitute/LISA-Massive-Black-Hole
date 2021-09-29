@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 
 // OSX
-// clang -Xpreprocessor -fopenmp -lomp -w -o search search.c IMRPhenomD_internals.c IMRPhenomD.c -lgsl -lgslcblas  -lm
+// clang -O3 -Xpreprocessor -fopenmp -lomp -w -o search search.c IMRPhenomD_internals.c IMRPhenomD.c -lgsl -lgslcblas  -lm
 
 // Linux
 // gcc -std=gnu99 -fopenmp -w -o search search.c IMRPhenomD_internals.c IMRPhenomD.c -lgsl -lgslcblas  -lm
@@ -272,6 +272,7 @@ int main(int argc, char *argv[])
 void search(double *pmax,  double **paramx, double *AC, double *EC, double *SN, double *SA, double *SE, double Tobs, int seg, int N, int rep)
 {
     int i, j, k, jj, mc, hold;
+    int boost;
     int *mh;
     double x, y, logLmax;
     double *logLx;
@@ -344,7 +345,7 @@ void search(double *pmax,  double **paramx, double *AC, double *EC, double *SN, 
     max[2] = 0.95;
     max[3] = 0.95;
     max[4] = PI;
-    max[5] = Tzero+2.0*Tobs-buffer*Tobs;  // merger could be up to 2 segments away
+    max[5] = Tzero+2.0*Tobs;  // merger could be up to 2 segments away
     max[6] = log(1.0e3);
     max[7] = 10.0;
     max[8] = 2.0*PI;
@@ -356,7 +357,7 @@ void search(double *pmax,  double **paramx, double *AC, double *EC, double *SN, 
     min[2] = -0.95;
     min[3] = -0.95;
     min[4] = 0.0;
-    min[5] = Tzero+buffer*Tobs;
+    min[5] = Tzero;
     min[6] = log(0.1);
     min[7] = 0.1;
     min[8] = 0.0;
@@ -403,8 +404,16 @@ void search(double *pmax,  double **paramx, double *AC, double *EC, double *SN, 
     
     logLmax = -1.0e10;
     
-    for(mc = 0; mc < MS; mc++)
+    boost = 0;
+    
+    for(mc = 0; mc < (MS+boost); mc++)
     {
+        
+        if(mc == MS/2)
+        {
+            if(logLmax > 1.0e4) boost = MS;
+            if(logLmax > 1.0e5) boost = 2*MS;
+        }
         
         if((mc+1)%(MS/8) == 0) // adapt the temperatures
         {
@@ -693,11 +702,23 @@ void update(int mc, int k, int ll, double *logLx, double **paramx, double **eval
     int q, i, j;
     int typ, flag;
     double lm1, lm2, s1, s2;
+    double lpx, lpy;
     double alpha, beta;
     double logLy, H, x;
     double SNR;
     double *paramy;
     double a, b, c, leta;
+    double tm;
+    
+    if(mc < MS/4)
+    {
+    tm = (double)(mc)/(double)(MS);
+    }
+    else
+    {
+     tm = 0.5 + (double)(mc)/(double)(MS);
+    }
+   
 
     paramy = double_vector(NP);
     
@@ -831,13 +852,36 @@ void update(int mc, int k, int ll, double *logLx, double **paramx, double **eval
         if(paramy[i] != paramy[i]) flag = 1; // crazier things have happened...
     }
     
+    // prior to keep solutions away from boundaries
+    
+    x = (paramx[q][5]-Tzero)/Tobs;
+    x = fabs(x-rint(x));
+    if(x > 0.25)
+    {
+        lpx = 0.0;
+    }
+    else
+    {
+        lpx = -1.0/(x*x);
+    }
+    
     x = (paramy[5]-Tzero)/Tobs;
-    if( fabs(x-rint(x)) < buffer ) flag = 1;  // keep merger away from boundaries
-
+    x = fabs(x-rint(x));
+    if(x > 0.25)
+    {
+        lpy = 0.0;
+    }
+    else
+    {
+        lpy = -1.0/(x*x);
+    }
+    
     
     if(flag == 0)
      {
-     if (mc < MS/8)  // time, phase and amplitude maximized
+        alpha = gsl_rng_uniform(r);
+         
+     if (alpha > tm)  // time, phase and amplitude maximized
       {
       logLy = log_likelihood_max_dual(ll, AC, EC, paramy, SA, SE, N, Tobs, Tzero);
       }
@@ -845,9 +889,10 @@ void update(int mc, int k, int ll, double *logLx, double **paramx, double **eval
       {
        logLy = log_likelihood_APmax_dual(ll, AC, EC, paramy, SA, SE, N, Tobs, Tzero);
       }
+         
      }
     
-    H = (logLy-logLx[q])/heat[k];
+    H = (logLy-logLx[q])/heat[k] + lpy - lpx;
      
     alpha = log(gsl_rng_uniform(r));
         
@@ -917,14 +962,12 @@ double findsky(int ll, double *params, double *min, double *max, double Tobs, do
      ts = Tmap(paramy, params[5]);
      paramy[5] = params[5]-ts;
     
-     x = (paramy[5]-Tzero)/Tobs;
+    
      logL = -100.0;
         
-    if(fabs(x-rint(x)) > buffer)
-    {
+ 
      logL = likelihoodFstatTmax(ll, paramy, N, AC, EC, SA, SE, Tobs, Tzero);
     //logL = likelihoodFstat(ll, paramy, N, AC, EC, SA, SE, Tobs, Tzero);
-    }
      
     if(logL > logLmax)
     {
@@ -936,7 +979,7 @@ double findsky(int ll, double *params, double *min, double *max, double Tobs, do
         
     k++;
         
-    }while(k < 10);
+    }while(k < 20);
     
     for (j=0; j< NP; j++) params[j] = pmax[j];
     
@@ -1004,7 +1047,7 @@ double Tmap(double *params, double tdet)
 
 void searchsky(double *pmax, double **paramx, double *AC, double *EC, double *SAS, double *SES, double *SA, double *SE, double Tobs, int seg, int N, int rep)
 {
-    int i, j, k, mc, hold;
+    int i, j, k, mc, hold, MXS;
     double x, logLmax, ts;
     double Mc, Mtot, eta, dm;
     double *logLx;
@@ -1076,7 +1119,7 @@ void searchsky(double *pmax, double **paramx, double *AC, double *EC, double *SA
     max[2] = 0.95;
     max[3] = 0.95;
     max[4] = PI;
-    max[5] = Tzero+2.0*Tobs-buffer*Tobs;
+    max[5] = Tzero+2.0*Tobs;
     max[6] = log(1.0e3);
     max[7] = 1.0;
     max[8] = 2.0*PI;
@@ -1088,7 +1131,7 @@ void searchsky(double *pmax, double **paramx, double *AC, double *EC, double *SA
     min[2] = -0.95;
     min[3] = -0.95;
     min[4] = 0.0;
-    min[5] = Tzero+buffer*Tobs;
+    min[5] = Tzero;
     min[6] = log(0.1);
     min[7] = -1.0;
     min[8] = 0.0;
@@ -1104,6 +1147,33 @@ void searchsky(double *pmax, double **paramx, double *AC, double *EC, double *SA
            logLx[i] = findsky(ll, paramx[i], min, max, Tobs, Tzero, N, AC, EC, SA, SE, rvec[i]);
        }
     
+    // find max likelihood solution
+    logLmax = -1.0e10;
+    for (i=0; i< NC; i++)
+    {
+        if(logLx[i] > logLmax)
+        {
+            j = i;
+            logLmax = logLx[i];
+        }
+    }
+    
+    MXS = MSS;
+    if(logLmax > 1.0e4) MXS = 2*MSS;
+    if(logLmax > 1.0e5) MXS = 4*MSS;
+    
+    
+    // clone any bad solutions to the best solution
+    for (i=0; i< NC; i++)
+    {
+        if(logLx[i] < 0.8*logLmax)
+        {
+            logLx[i] = logLmax;
+            for(k = 0; k < NP; k++) paramx[i][k] = paramx[j][k];
+        }
+    }
+    
+    
     sprintf(filename, "searchsky_%d_%d.dat", seg, rep);
     chain = fopen(filename,"w");
     sprintf(filename, "likesky_%d_%d.dat", seg, rep);
@@ -1111,7 +1181,7 @@ void searchsky(double *pmax, double **paramx, double *AC, double *EC, double *SA
     
     logLmax = -1.0e10;
     
-    for(mc = 0; mc < MSS; mc++)
+    for(mc = 0; mc < MXS; mc++)
     {
         
        // printf("mc = %d \n", mc);
@@ -1336,6 +1406,7 @@ void updatesky(int mc, int k, int ll, double *logLx, double **paramx, double **e
     double *paramy;
     double a, b;
     double pDx, pDy;
+    double lpx, lpy;
     double **Chl, **Cov;
     double *zv;
     
@@ -1468,9 +1539,6 @@ void updatesky(int mc, int k, int ll, double *logLx, double **paramx, double **e
            if(paramy[i] != paramy[i]) flag = 1; // crazier things have happened...
        }
     
-       x = (paramy[5]-Tzero)/Tobs;
-       if( fabs(x-rint(x)) < buffer ) flag = 1;  // keep merger away from boundaries
-    
       if(flag == 0)
       {
          logLy = likelihoodFstat(ll, paramy, N, AC, EC, SA, SE, Tobs, Tzero);
@@ -1483,11 +1551,35 @@ void updatesky(int mc, int k, int ll, double *logLx, double **paramx, double **e
     if(paramy[9] != paramy[9]) paramy[9] = PI/4.0;
     if(paramy[10] != paramy[10]) paramy[10] = 0.0;
     
+    // prior to keep solutions away from boundaries
+     
+     x = (paramx[q][5]-Tzero)/Tobs;
+     x = fabs(x-rint(x));
+     if(x > 0.25)
+     {
+         lpx = 0.0;
+     }
+     else
+     {
+         lpx = -1.0/(x*x);
+     }
+     
+     x = (paramy[5]-Tzero)/Tobs;
+     x = fabs(x-rint(x));
+     if(x > 0.25)
+     {
+         lpy = 0.0;
+     }
+     else
+     {
+         lpy = -1.0/(x*x);
+     }
+    
 
     pDx = paramx[q][6];   // uniform in distance prior
     pDy = paramy[6];   // uniform in distance prior
     
-    H = (logLy-logLx[q])/heat[k] + pDy - pDx;
+    H = (logLy-logLx[q])/heat[k] + pDy + lpy - pDx - lpx;
      
     alpha = log(gsl_rng_uniform(r));
         
@@ -1503,9 +1595,6 @@ void updatesky(int mc, int k, int ll, double *logLx, double **paramx, double **e
  
     
 }
-
-
-
 
 
 double fourier_nwip(double *a, double *b, double *Sn, int n)
@@ -3606,18 +3695,13 @@ double log_likelihood_max_dual(int ll, double *A, double *E, double *params, dou
     for (i = -Nend/2; i < Nend/2; ++i)
     {
         j = i+N/2;
-        t = params[5]+(double)(i)*dt;
         
-        y = (t-Tzero)/Tobs;
-        
-        if(fabs(y-rint(y)) > buffer)
-        {
          if((AS[j]+ES[j]) > x)
          {
             x = AS[j]+ES[j];
             k = i;
          }
-        }
+        
     }
         
     HA = 0.0;
