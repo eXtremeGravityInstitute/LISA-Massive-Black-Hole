@@ -13,7 +13,7 @@ echo "# end =" $sege
 for ((j=segs;j<=sege;j++))
 do
 echo $j
-./search $j
+./search $j $j
 done
 
 
