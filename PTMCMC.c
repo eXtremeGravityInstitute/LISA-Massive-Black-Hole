@@ -376,9 +376,13 @@ int main(int argc,char **argv)
 
 void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **paramx)
 {
-    double *logLx, SNR, x;
+    int NP = NParams;
+    double *AAmp, *EAmp, *APhase, *EPhase;
+    double kxm, *logLx, SNR, x;
     double m1, m2;
-    int i, j, k, q, mc, N;
+    int i, j, k, n, q, mc, NF, N;
+    int NFmax = 100000;
+    double *AF, *PF, *FF, *TF, *FS;
     int NH=1000;
     int MP;
     int M = 2000000;
@@ -422,6 +426,23 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
     pmax = (double*)malloc(sizeof(double)* (NParams));
     pref = (double*)malloc(sizeof(double)* (NParams));
 
+    for (i=0; i< NP; i++) pref[i] = paramx[who[0]][i];
+
+    FS = (double*)malloc(sizeof(double)* (NFmax));
+
+    SetUp(dat, ll, pref, &NF, FS);
+
+    AF = (double*)malloc(sizeof(double)* (NF));
+    PF = (double*)malloc(sizeof(double)* (NF));
+    TF = (double*)malloc(sizeof(double)* (NF));
+    
+    Intrinsic(ll, pref, dat->Tstart, NF, FS, TF, PF, AF);
+    
+    AAmp = (double*)malloc(sizeof(double)* (NF));
+    EAmp = (double*)malloc(sizeof(double)* (NF));
+    APhase = (double*)malloc(sizeof(double)* (NF));
+    EPhase = (double*)malloc(sizeof(double)* (NF));
+    
     antennaphaseamp(dat, ll, pref);
     
    
@@ -440,6 +461,16 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
     sx = double_matrix(NC,dat->Nch);
     sy = double_matrix(NC,dat->Nch);
     
+    Extrinsic(pref, dat->Tstart, dat->Tend, NF, FS, TF, PF, AF, AAmp, EAmp, APhase, EPhase, &kxm);
+    
+    FF = (double*)malloc(sizeof(double)* (NF+1));
+    for(n=0; n< NF; n++) FF[n] = FS[n];
+    
+    free(FS);
+    free(TF);
+    free(PF);
+    free(AF);
+
     // prior boundaries
     max = (double*)malloc(sizeof(double)* (NParams));
     min = (double*)malloc(sizeof(double)* (NParams));
