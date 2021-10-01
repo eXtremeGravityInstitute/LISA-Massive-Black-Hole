@@ -5723,5 +5723,3 @@ void free_double_tensor(double ***t, int N, int M)
     
     free(t);
 }
-
-
