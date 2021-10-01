@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 double cosw(double t, double Tint);
 
 #define DATASET "/obs/tdi"
-#define FILENAME "LDC2_sangria_blind_v2.h5"
+#define FILENAME "LDC2_sangria_training_v2.h5"
 
 struct TDI
 {
