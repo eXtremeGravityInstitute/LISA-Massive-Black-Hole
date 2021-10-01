@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
     hid_t ldc_data_tid;
     
     ldc_data_tid = H5Tcreate(H5T_COMPOUND, sizeof(struct tdi_dataset));
-    H5Tinsert(ldc_data_tid, "t", HOFFSET(struct tdi_dataset, t), H5T_IEEE_F64LE);
+    H5Tinsert(ldc_data_tid, "time", HOFFSET(struct tdi_dataset, t), H5T_IEEE_F64LE);
     H5Tinsert(ldc_data_tid, "X", HOFFSET(struct tdi_dataset, X), H5T_IEEE_F64LE);
     H5Tinsert(ldc_data_tid, "Y", HOFFSET(struct tdi_dataset, Y), H5T_IEEE_F64LE);
     H5Tinsert(ldc_data_tid, "Z", HOFFSET(struct tdi_dataset, Z), H5T_IEEE_F64LE);
