@@ -23,4 +23,6 @@ add_library(mbh STATIC Utils.c IMRPhenomD.c IMRPhenomD_internals.c Response.c IM
 include_directories(SYSTEM ${GSL_INCLUDE_DIRS})
 target_link_libraries(mbh ${GSL_LIBRARIES} m)
 set_target_properties(mbh PROPERTIES PUBLIC_HEADER "mbh.h;IMRPhenomD.h;IMRPhenomD_internals.h;Declarations.h;Constants.h")
-install(TARGETS mbh LIBRARY DESTINATION lib PUBLIC_HEADER DESTINATION include)
+install(TARGETS mbh EXPORT MBHConfig LIBRARY DESTINATION lib PUBLIC_HEADER DESTINATION include)
+export(TARGETS mbh NAMESPACE MBH:: FILE "MBHConfig.cmake")
+install(EXPORT MBHConfig DESTINATION lib/cmake/mbh NAMESPACE MBH::)
