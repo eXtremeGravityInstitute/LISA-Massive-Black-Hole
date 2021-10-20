@@ -3555,7 +3555,7 @@ void efix(struct Data *dat, struct Het *het, int hr, int ll, double *params, dou
             
             if(hr == 1)  // using heterodyne
             {
-            x = chisq_het(dat, het, ll, px, ampR, phaseR);
+            z = chisq_het(dat, het, ll, px, ampR, phaseR);
             }
             else
             {
