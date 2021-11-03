@@ -44,7 +44,6 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     double **fisher;
     double **evec, *eval;
     double **dparams, *px;
-    double alpha0=0.0;
     double leta, eta;
     double dfmax;
     
@@ -101,7 +100,7 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
            eta = exp(leta);
            if(eta > 0.25)
            {
-           for (j = 0; j < NParams; ++j) px[j] = params[j] - alpha0*eval[i]*evec[i][j];
+           for (j = 0; j < NParams; ++j) px[j] = params[j] - eval[i]*evec[i][j];
            }
           }
           
@@ -2832,127 +2831,51 @@ void efix(struct MBH_Data *dat, struct Het *het, int hr, int ll, double *params,
     
     if(hr == 1)  // using heterodyne
     {
-    ampR = double_matrix(het->Nch,het->M);
-    phaseR = double_matrix(het->Nch,het->M);
-    fullphaseamp(dat, ll, het->M, params, het->freq, ampR[0], ampR[1], phaseR[0], phaseR[1]);
+        ampR = double_matrix(het->Nch,het->M);
+        phaseR = double_matrix(het->Nch,het->M);
+        fullphaseamp(dat, ll, het->M, params, het->freq, ampR[0], ampR[1], phaseR[0], phaseR[1]);
     }
     else
     {
-    AR = (double*)malloc(sizeof(double)* (dat->N));
-    ER = (double*)malloc(sizeof(double)* (dat->N));
-    ResponseFast(dat, ll, params, AR, ER);
+        AR = (double*)malloc(sizeof(double)* (dat->N));
+        ER = (double*)malloc(sizeof(double)* (dat->N));
+        ResponseFast(dat, ll, params, AR, ER);
     }
     
     // [0] ln(Mass1)  [1] ln(Mass2)  [2] Spin1 [3] Spin2 [4] phic [5] tc [6] ln(distance)
-     // [7] EclipticCoLatitude, [8] EclipticLongitude  [9] polarization, [10] inclination
-   
+    // [7] EclipticCoLatitude, [8] EclipticLongitude  [9] polarization, [10] inclination
+    
     zmx = zs*2.0;
     zmn = zs/2.0;
     
     px = double_vector(NParams);
-
-   for (i = 0; i < NParams; ++i)
-     {
-         
+    
+    for (i = 0; i < NParams; ++i)
+    {
+        
         dzmin = 1.0e20;
         alpham = 1.0;
-         
-      alpha0 = 1.0;
-         
         
-      k = 0;
-      do
-      {
-      for (j = 0; j < NParams; ++j) px[j] = params[j] + alpha0*eval[i]*evec[i][j];
-      
-      if(ll == 2)
-          {
-        leta = (5.0/3.0)*(px[0]-px[1]);
-        eta = exp(leta);
-         if(eta > 0.25)
-         {
-         for (j = 0; j < NParams; ++j) px[j] = params[j] - alpha0*eval[i]*evec[i][j];
-         }
-          }
-          
-          // re-map angular parameters to their proper range
-          
-          x = px[4]/PI;
-          px[4] = (x-floor(x))*PI;
-          if(x < 0.0) px[4] += 1.0;
-          x = px[8]/TPI;
-          px[8] = (x-floor(x))*TPI;
-          if(x < 0.0) px[8] += 1.0;
-          x = px[9]/PI;
-          px[9] = (x-floor(x))*PI;
-          if(x < 0.0) px[9] += 1.0;
-          
-          while(px[4] > PI)  px[4] -= PI;
-          while(px[4] < 0.0)  px[4] += PI;
-          while(px[8] > TPI)  px[8] -= TPI;
-          while(px[8] < 0.0)  px[8] += TPI;
-          while(px[9] > PI)   px[9] -= PI;
-          while(px[9] < 0.0)  px[9] += PI;
-          
-         // for (j = 0; j < NParams; ++j) printf("%d %e %e %e %e\n", j, px[j], params[j], min[j], max[j]);
-          
-          
-          for (j = 0; j < NParams; ++j) if(px[j] > max[j]) px[j] = max[j];
-          for (j = 0; j < NParams; ++j) if(px[j] < min[j]) px[j] = min[j];
-      
-          if(ll == 2)
-          {
-          leta = (5.0/3.0)*(px[0]-px[1]);
-          eta = exp(leta);
-          if(eta > 0.25) px[0] = px[1] + 3.0/5.0*log(0.2499);
-          if(eta < etamin) px[0] = px[1] + 3.0/5.0*log(etamin);
-          }
-          
-          if(hr == 1)  // using heterodyne
-          {
-          z0 = chisq_het(dat, het, ll, px, ampR, phaseR);
-          }
-          else
-          {
-          z0 = chisq(dat, ll, px, AR, ER);
-          }
-          
-         //printf("B %f %f\n", alpha0, z0);
-          
-          dz = fabs(z0-zs);
-          if(dz < dzmin)
-          {
-              dzmin = dz;
-              alpham = alpha0;
-              zm = z0;
-          }
-          
-          if(z0 < zmn) alpha0 *= 2.0;
-          if(z0 > zmx) alpha0 /= 1.9;
-          
-          k++;
-          
-      } while ( (z0 > zmx || z0 < zmn) && k < 15 && fabs(alpha0) < 1.0e4);
-      
-      
-      alpha = alpha0*1.1;
-          
+        alpha0 = 1.0;
+        
+        
         k = 0;
         do
         {
-        for (j = 0; j < NParams; ++j) px[j] = params[j] + alpha*eval[i]*evec[i][j];
-         
-        if(ll == 2)
-        {
-        leta = (5.0/3.0)*(px[0]-px[1]);
-        eta = exp(leta);
-        if(eta > 0.25)
-        {
-          for (j = 0; j < NParams; ++j) px[j] = params[j] - alpha*eval[i]*evec[i][j];
-        }
-        }
+            for (j = 0; j < NParams; ++j) px[j] = params[j] + alpha0*eval[i]*evec[i][j];
             
-        // re-map angular parameters to their proper range
+            if(ll == 2)
+            {
+                leta = (5.0/3.0)*(px[0]-px[1]);
+                eta = exp(leta);
+                if(eta > 0.25)
+                {
+                    for (j = 0; j < NParams; ++j) px[j] = params[j] - alpha0*eval[i]*evec[i][j];
+                }
+            }
+            
+            // re-map angular parameters to their proper range
+            
             x = px[4]/PI;
             px[4] = (x-floor(x))*PI;
             if(x < 0.0) px[4] += 1.0;
@@ -2963,85 +2886,161 @@ void efix(struct MBH_Data *dat, struct Het *het, int hr, int ll, double *params,
             px[9] = (x-floor(x))*PI;
             if(x < 0.0) px[9] += 1.0;
             
-        while(px[4] > PI)  px[4] -= PI;
-        while(px[4] < 0.0)  px[4] += PI;
-        while(px[8] > TPI)  px[8] -= TPI;
-        while(px[8] < 0.0)  px[8] += TPI;
-        while(px[9] > PI)   px[9] -= PI;
-        while(px[9] < 0.0)  px[9] += PI;
+            while(px[4] > PI)  px[4] -= PI;
+            while(px[4] < 0.0)  px[4] += PI;
+            while(px[8] > TPI)  px[8] -= TPI;
+            while(px[8] < 0.0)  px[8] += TPI;
+            while(px[9] > PI)   px[9] -= PI;
+            while(px[9] < 0.0)  px[9] += PI;
             
-        for (j = 0; j < NParams; ++j) if(px[j] > max[j]) px[j] = max[j];
-        for (j = 0; j < NParams; ++j) if(px[j] < min[j]) px[j] = min[j];
+            // for (j = 0; j < NParams; ++j) printf("%d %e %e %e %e\n", j, px[j], params[j], min[j], max[j]);
+            
+            
+            for (j = 0; j < NParams; ++j) if(px[j] > max[j]) px[j] = max[j];
+            for (j = 0; j < NParams; ++j) if(px[j] < min[j]) px[j] = min[j];
             
             if(ll == 2)
             {
-            leta = (5.0/3.0)*(px[0]-px[1]);
-            eta = exp(leta);
-            if(eta > 0.25) px[0] = px[1] + 3.0/5.0*log(0.2499);
-            if(eta < etamin) px[0] = px[1] + 3.0/5.0*log(etamin);
+                leta = (5.0/3.0)*(px[0]-px[1]);
+                eta = exp(leta);
+                if(eta > 0.25) px[0] = px[1] + 3.0/5.0*log(0.2499);
+                if(eta < etamin) px[0] = px[1] + 3.0/5.0*log(etamin);
             }
-            
-           
             
             if(hr == 1)  // using heterodyne
             {
-            x = chisq_het(dat, het, ll, px, ampR, phaseR);
+                z0 = chisq_het(dat, het, ll, px, ampR, phaseR);
             }
             else
             {
-              z = chisq(dat, ll, px, AR, ER);
+                z0 = chisq(dat, ll, px, AR, ER);
+            }
+            
+            //printf("B %f %f\n", alpha0, z0);
+            
+            dz = fabs(z0-zs);
+            if(dz < dzmin)
+            {
+                dzmin = dz;
+                alpham = alpha0;
+                zm = z0;
+            }
+            
+            if(z0 < zmn) alpha0 *= 2.0;
+            if(z0 > zmx) alpha0 /= 1.9;
+            
+            k++;
+            
+        } while ( (z0 > zmx || z0 < zmn) && k < 15 && fabs(alpha0) < 1.0e4);
+        
+        
+        alpha = alpha0*1.1;
+        
+        k = 0;
+        do
+        {
+            for (j = 0; j < NParams; ++j) px[j] = params[j] + alpha*eval[i]*evec[i][j];
+            
+            if(ll == 2)
+            {
+                leta = (5.0/3.0)*(px[0]-px[1]);
+                eta = exp(leta);
+                if(eta > 0.25)
+                {
+                    for (j = 0; j < NParams; ++j) px[j] = params[j] - alpha*eval[i]*evec[i][j];
+                }
+            }
+            
+            // re-map angular parameters to their proper range
+            x = px[4]/PI;
+            px[4] = (x-floor(x))*PI;
+            if(x < 0.0) px[4] += 1.0;
+            x = px[8]/TPI;
+            px[8] = (x-floor(x))*TPI;
+            if(x < 0.0) px[8] += 1.0;
+            x = px[9]/PI;
+            px[9] = (x-floor(x))*PI;
+            if(x < 0.0) px[9] += 1.0;
+            
+            while(px[4] > PI)  px[4] -= PI;
+            while(px[4] < 0.0)  px[4] += PI;
+            while(px[8] > TPI)  px[8] -= TPI;
+            while(px[8] < 0.0)  px[8] += TPI;
+            while(px[9] > PI)   px[9] -= PI;
+            while(px[9] < 0.0)  px[9] += PI;
+            
+            for (j = 0; j < NParams; ++j) if(px[j] > max[j]) px[j] = max[j];
+            for (j = 0; j < NParams; ++j) if(px[j] < min[j]) px[j] = min[j];
+            
+            if(ll == 2)
+            {
+                leta = (5.0/3.0)*(px[0]-px[1]);
+                eta = exp(leta);
+                if(eta > 0.25) px[0] = px[1] + 3.0/5.0*log(0.2499);
+                if(eta < etamin) px[0] = px[1] + 3.0/5.0*log(etamin);
+            }
+            
+            
+            
+            if(hr == 1)  // using heterodyne
+            {
+                x = chisq_het(dat, het, ll, px, ampR, phaseR);
+            }
+            else
+            {
+                z = chisq(dat, ll, px, AR, ER);
             }
             
             //printf("R %f %f\n", alpha, z);
             
             if(alpha > alpha0)
             {
-            alphanew = alpha0 +(zs-z0)/(z-z0)*(alpha-alpha0);
+                alphanew = alpha0 +(zs-z0)/(z-z0)*(alpha-alpha0);
             }
             else
             {
-             alphanew = alpha +(zs-z)/(z0-z)*(alpha0-alpha);
+                alphanew = alpha +(zs-z)/(z0-z)*(alpha0-alpha);
             }
             
             dz = fabs(z-zs);
             if(dz < dzmin)
             {
-              dzmin = dz;
-              alpham = alpha;
-              zm = z;
+                dzmin = dz;
+                alpham = alpha;
+                zm = z;
             }
             
             z0 = z;
             alpha0 = alpha;
             alpha = alphanew;
- 
-             k++;
-             
+            
+            k++;
+            
         } while (fabs(z-zs) > 0.2 && k < 10 && fabs(alpha) < 1.0e4);
-         
-          // printf("F %f %f\n", alpham, zm);
-         
-         // printf("\n");
-         
-         // kill any failed direction
-         if(dzmin/zs > 1.0) alpham = 0.0;
-         
-         
-         eval[i] *= alpham;
-      
-     }
+        
+        // printf("F %f %f\n", alpham, zm);
+        
+        // printf("\n");
+        
+        // kill any failed direction
+        if(dzmin/zs > 1.0) alpham = 0.0;
+        
+        
+        eval[i] *= alpham;
+        
+    }
     
     free_double_vector(px);
     
     if(hr == 1)  // using heterodyne
     {
-    free_double_matrix(ampR,het->Nch);
-    free_double_matrix(phaseR,het->Nch);
+        free_double_matrix(ampR,het->Nch);
+        free_double_matrix(phaseR,het->Nch);
     }
     else
     {
-     free(AR);
-     free(ER);
+        free(AR);
+        free(ER);
     }
     
 }
