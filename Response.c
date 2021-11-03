@@ -44,7 +44,6 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     double **fisher;
     double **evec, *eval;
     double **dparams, *px;
-    double alpha0=0.0;
     double leta, eta;
     double dfmax;
     
@@ -101,7 +100,7 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
            eta = exp(leta);
            if(eta > 0.25)
            {
-           for (j = 0; j < NParams; ++j) px[j] = params[j] - alpha0*eval[i]*evec[i][j];
+           for (j = 0; j < NParams; ++j) px[j] = params[j] - eval[i]*evec[i][j];
            }
           }
           
