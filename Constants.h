@@ -134,5 +134,6 @@
 #define sflag 0
 
 #define etamin 0.05     // lower limit on the symmetric mass ratio (18:1 mass ratio)
+#define etamax 0.24999
 
 

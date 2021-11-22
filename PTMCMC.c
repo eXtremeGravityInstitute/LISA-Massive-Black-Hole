@@ -58,33 +58,20 @@ void MCMC(struct MBH_Data *dat, struct Het *het, int ll, int *who, double **para
 int main(int argc,char **argv)
 {
     int NP = NParams; /* NP as a global variable clashed w/ Global Fit */
-  double f, fdot, theta, phi, A, iota, psi, phase;
-  char Gfile[50];
+  double f;
   char filename[50];
-  double *params, *premove, *pnew;
+  double *params, *premove;
   double *AS, *ES;
-  double *AQ, *EQ;
-  double AR, AI, ER, EI;
-  double fonfs, Sn, Sm, Acut;
-  double Aar, Aai;
-  double x, y, z;
-  long M, q;
-  long i, j, k, cnt, mult, id, NS;
-  double Mc, fstart, fstop, fr;
-  double SNR, logL;
-  double HH, HD, HDQ, DD, Match, MX, ts, ps;
-  double HHA, HDA, DDA, HHE, HDE, DDE, MA, ME;
+  double x;
+  long i, j, k, id, NS;
     
   struct Het *het   = malloc(sizeof(struct Het));
   struct MBH_Data *dat  = malloc(sizeof(struct MBH_Data));
     
-  double *AC, *EC, *TC;
     
     int seg, rep;
     
     
-    clock_t start, end;
-    double cpu_time_used;
     
     const gsl_rng_type * P;
     gsl_rng * r;
@@ -187,7 +174,7 @@ int main(int argc,char **argv)
     // read in the previously estimated smooth and full PSDs
     for(id=0; id < dat->Nch; id++)
     {
-      sprintf(filename, "specfit_%d_%d.dat", id, seg);
+      sprintf(filename, "specfit_%li_%i.dat", id, seg);
       in = fopen(filename,"r");
       for(i=0; i< dat->N/2; i++)
       {
@@ -223,7 +210,7 @@ int main(int argc,char **argv)
         // read in the previously estimated smooth and full PSDs
         for(id=0; id < dat->Nch; id++)
         {
-          sprintf(filename, "specav_%d.dat", id);
+          sprintf(filename, "specav_%li.dat", id);
           in = fopen(filename,"r");
           for(i=0; i< dat->N/2; i++)
           {
