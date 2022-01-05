@@ -41,6 +41,7 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     double tol, tl;
     double cmid, smid, dmid;
     FILE *out;
+    char outFile[1024];
     double **fisher;
     double **evec, *eval;
     double **dparams, *px;
@@ -48,25 +49,41 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     double dfmax;
     
     N = dat->N;
-    
-    pflag = 0;  // print diagnostics if pflag = 1
-    
-    int Nch = dat->Nch;
-    
-    het->Nch = Nch;
-    
-    int NF;
-    int NFmax = 100000;
-    
-    double *AF, *PF, *FF, *TF;
        
-    FF = (double*)malloc(sizeof(double)* (NFmax));
+       pflag = 0;  // print diagnostics if pflag = 1
        
-    SetUp(dat, ll, params, &NF, FF);
-    
-    x = SNRstart(dat, ll, params);
-    
-    if(x > FF[0]) FF[0] = x;
+       int Nch = dat->Nch;
+       
+       het->Nch = Nch;
+       
+       int NF;
+       int NFmax = 100000;
+       
+       double *FFX, *FF;
+          
+       FFX = (double*)malloc(sizeof(double)* (NFmax));
+          
+       SetUp(dat, ll, params, &NF, FFX);
+       
+       x = SNRstart(dat, ll, params);
+       
+       i = -1;
+       flag = 0;
+       do
+       {
+           i++;
+       } while(FFX[i] < x && i < NF);
+       
+       i -= 1;
+       if(i < 0) i=0;
+       
+       NF -= i;
+       
+       FF = (double*)malloc(sizeof(double)* (NF));
+       
+       for (j = 0; j < NF; ++j) FF[j] = FFX[j+i];
+       
+       free(FFX);
     
    // printf("%f %f\n", FF[0], FF[NF-1]);
     
@@ -152,10 +169,6 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     Cs = double_tensor(NParams,Nch,NF);
     Sn = double_tensor(NParams,Nch,NF);
     DH = double_tensor(NParams,Nch,NF);
-    
-    TF = (double*)malloc(sizeof(double)* (NF));
-    PF = (double*)malloc(sizeof(double)* (NF));
-    AF = (double*)malloc(sizeof(double)* (NF));
         
     // reference amplitude and phase
     fullphaseamp(dat, ll, NF, params, FF, Ar[0], Ar[1], Pr[0], Pr[1]);
@@ -263,14 +276,18 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
         
     
     if(pflag == 1)
-       {
-       out = fopen("df.dat","w");
-       for (i = 0; i < M; ++i)
-       {
-           fprintf(out,"%e %e\n", fgrid[i], fgrid[i+1]-fgrid[i]);
-       }
-       fclose(out);
-       }
+    {
+        sprintf(outFile,"df_%.1e.dat",params[5]);
+        out = fopen(outFile,"w");
+        fprintf(out,"#");
+        for (i = 0; i < NParams; ++i) fprintf(out,"%lg ",params[i]);
+        fprintf(out,"\n");
+        for (i = 0; i < M; ++i)
+        {
+            fprintf(out,"%e %e\n", fgrid[i], fgrid[i+1]-fgrid[i]);
+        }
+        fclose(out);
+    }
 
     
     for (i = 0; i < N/2; ++i) dfa[i] = 1.0/dat->Tobs;
@@ -364,12 +381,18 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     
     if(pflag == 1)
     {
-     out = fopen("df_flat.dat","w");
-     for (i = 0; i < ii; ++i)
-     {
-         fprintf(out,"%e %e\n", (double)(fgflat[i])/dat->Tobs, (double)(fgflat[i+1]-fgflat[i])/dat->Tobs);
-     }
-     fclose(out);
+        sprintf(outFile,"df_flat_%.1e.dat",params[5]);
+        out = fopen(outFile,"w");
+        
+        fprintf(out,"#");
+        for (i = 0; i < NParams; ++i) fprintf(out,"%lg ",params[i]);
+        fprintf(out,"\n");
+        
+        for (i = 0; i < ii; ++i)
+        {
+            fprintf(out,"%e %e\n", (double)(fgflat[i])/dat->Tobs, (double)(fgflat[i+1]-fgflat[i])/dat->Tobs);
+        }
+        fclose(out);
     }
     
     
@@ -392,14 +415,9 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
     dat->fmax = (double)het->MM/dat->Tobs;
     
     free(FF);
-    free(TF);
-    free(PF);
-    free(AF);
 
     free_int_vector(fgflat);
     free_double_vector(dfa);
-    //free_double_vector(ratio);
-    //free_int_vector(stst);
     free_double_matrix(dparams,NParams);
     free_double_matrix(fisher,NParams);
     free_double_matrix(evec,NParams);
@@ -3084,7 +3102,7 @@ double SNRstart(struct MBH_Data *dat, int ll, double *params)
     double SNRmin = 0.01;
     double HHmin;
     int i, j, imax;
-    
+
     // This subroutine finds the frequency where we start to get some SNRb accumulation
     
     HHmin = SNRmin*SNRmin;
