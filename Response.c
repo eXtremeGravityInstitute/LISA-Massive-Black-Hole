@@ -79,7 +79,7 @@ void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, do
        
        NF -= i;
        
-       FF = (double*)malloc(sizeof(double)* (NF));
+       FF = (double*)malloc(sizeof(double)* (NFmax));
        
        for (j = 0; j < NF; ++j) FF[j] = FFX[j+i];
        
