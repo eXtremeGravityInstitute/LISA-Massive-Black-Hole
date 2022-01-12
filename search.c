@@ -1597,9 +1597,6 @@ void updatesky(int mc, int k, int ll, double *logLx, double **paramx, double **e
 }
 
 
-
-
-
 double fourier_nwip(double *a, double *b, double *Sn, int n)
 {
     int i, j, k;

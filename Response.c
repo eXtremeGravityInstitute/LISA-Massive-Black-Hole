@@ -3002,7 +3002,7 @@ void efix(struct MBH_Data *dat, struct Het *het, int hr, int ll, double *params,
             
             if(hr == 1)  // using heterodyne
             {
-             z = chisq_het(dat, het, ll, px, ampR, phaseR);
+            z = chisq_het(dat, het, ll, px, ampR, phaseR);
             }
             else
             {
