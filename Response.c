@@ -1,5 +1,22 @@
-#include "Constants.h"
-#include "IMRPhenomD.h"
+/*******************************************************************************************
+ 
+ Copyright (c) 2021 Neil Cornish & Tyson Littenberg
+ 
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ 
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+ **********************************************************************************************/
+
 #include <gsl/gsl_spline.h>
 #include <gsl/gsl_fft_real.h>
 #include <gsl/gsl_fft_halfcomplex.h>
@@ -9,55 +26,64 @@
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 #include <time.h>
-#include "Declarations.h"
+#include "mbh.h"
 
-void het_space(struct Data *dat, struct Het *het, int ll, double *params, double *min, double *max)
+void het_space(struct MBH_Data *dat, struct Het *het, int ll, double *params, double *min, double *max)
 {
-    int i, id, j, k, ii, jj, kk, MN, MM, jmin, flag, djmax, N, M, J, NR;
-    int jmid, boost;
+    int i, id, j, k, ii, jj, kk, MN, MM, jmin, flag, N, M, J, NR;
+    int jmid;
     int pflag;
     double **Ar, ***Ap, **Pr, ***Pp;
     double ***Cs, ***Sn, ***DH;
     double *dfa;
     double *fgrid;
-    double fstop;
-    char filename[1024];
-    double k0, k1, k2;
-    double norm0, norm1;
-    double x, y, z;
-    double tol, tl, tola, tla;
+    double x;
+    double tol, tl;
     double cmid, smid, dmid;
     FILE *out;
-    double *ratio;
-    int *stst;
-    double **fisher, **cov;
+    char outFile[1024];
+    double **fisher;
     double **evec, *eval;
     double **dparams, *px;
-    double alpha0, z0, zs, alphanew;
     double leta, eta;
-    double alphax, dz, LDLmin, Lmax;
-    double kxm, dfmax;
+    double dfmax;
     
     N = dat->N;
-    
-    pflag = 1;  // print diagnostics if pflag = 1
-    
-    int Nch = dat->Nch;
-    
-    het->Nch = Nch;
-    
-    int NF;
-    int NFmax = 100000;
-    
-    double *AF, *PF, *FF, *TF;
        
-    FF = (double*)malloc(sizeof(double)* (NFmax));
+       pflag = 0;  // print diagnostics if pflag = 1
        
-    SetUp(dat, ll, params, NFmax, &NF, FF);
-    
-    x = SNRstart(dat, ll, params);
-    
-    if(x > FF[0]) FF[0] = x;
+       int Nch = dat->Nch;
+       
+       het->Nch = Nch;
+       
+       int NF;
+       int NFmax = 100000;
+       
+       double *FFX, *FF;
+          
+       FFX = (double*)malloc(sizeof(double)* (NFmax));
+          
+       SetUp(dat, ll, params, &NF, FFX);
+       
+       x = SNRstart(dat, ll, params);
+       
+       i = -1;
+       flag = 0;
+       do
+       {
+           i++;
+       } while(FFX[i] < x && i < NF);
+       
+       i -= 1;
+       if(i < 0) i=0;
+       
+       NF -= i;
+       
+       FF = (double*)malloc(sizeof(double)* (NFmax));
+       
+       for (j = 0; j < NF; ++j) FF[j] = FFX[j+i];
+       
+       free(FFX);
     
    // printf("%f %f\n", FF[0], FF[NF-1]);
     
@@ -68,30 +94,30 @@ void het_space(struct Data *dat, struct Het *het, int ll, double *params, double
     J = 2;
     tol = 0.00001;
 
-    dparams = double_matrix(NP,NP);
-    fisher = double_matrix(NP,NP);
-    evec = double_matrix(NP,NP);
-    eval = double_vector(NP);
-    px = double_vector(NP);
+    dparams = double_matrix(NParams,NParams);
+    fisher = double_matrix(NParams,NParams);
+    evec = double_matrix(NParams,NParams);
+    eval = double_vector(NParams);
+    px = double_vector(NParams);
     
     dfa = double_vector(N/2);
     
     FisherFast(dat, 2, params, fisher);
-    FisherEvec(fisher, eval, evec, NP);
+    FisherEvec(fisher, eval, evec, NParams);
     efix(dat, het, 0, 2, params, min, max, eval, evec, 50.0);
     
 
-    for (i = 0; i < NP; ++i)
+    for (i = 0; i < NParams; ++i)
     {
-        for (j = 0; j < NP; ++j) px[j] = params[j] + eval[i]*evec[i][j];
+        for (j = 0; j < NParams; ++j) px[j] = params[j] + eval[i]*evec[i][j];
         
          if(ll == 2)
           {
            leta = (5.0/3.0)*(px[0]-px[1]);
            eta = exp(leta);
-           if(eta > 0.25)
+           if(eta > etamax)
            {
-           for (j = 0; j < NP; ++j) px[j] = params[j] - alpha0*eval[i]*evec[i][j];
+           for (j = 0; j < NParams; ++j) px[j] = params[j] - eval[i]*evec[i][j];
            }
           }
           
@@ -114,19 +140,19 @@ void het_space(struct Data *dat, struct Het *het, int ll, double *params, double
           while(px[9] > PI)   px[9] -= PI;
           while(px[9] < 0.0)  px[9] += PI;
         
-          for (j = 0; j < NP; ++j) if(px[j] > max[j]) px[j] = max[j];
-          for (j = 0; j < NP; ++j) if(px[j] < min[j]) px[j] = min[j];
+          for (j = 0; j < NParams; ++j) if(px[j] > max[j]) px[j] = max[j];
+          for (j = 0; j < NParams; ++j) if(px[j] < min[j]) px[j] = min[j];
             
           if(ll == 2)
             {
             leta = (5.0/3.0)*(px[0]-px[1]);
             eta = exp(leta);
-            if(eta > 0.25) px[0] = px[1] + 3.0/5.0*log(0.2499);
+            if(eta > etamax) px[0] = px[1] + 3.0/5.0*log(etamax);
             if(eta < etamin) px[0] = px[1] + 3.0/5.0*log(etamin);
             }
 
         
-        for (j = 0; j < NP; ++j) dparams[i][j] = px[j];
+        for (j = 0; j < NParams; ++j) dparams[i][j] = px[j];
                    
         }
     
@@ -137,28 +163,22 @@ void het_space(struct Data *dat, struct Het *het, int ll, double *params, double
     
     
     Ar = double_matrix(Nch,NF);
-    Ap = double_tensor(NP,Nch,NF);
+    Ap = double_tensor(NParams,Nch,NF);
     Pr = double_matrix(Nch,NF);
-    Pp = double_tensor(NP,Nch,NF);
-    Cs = double_tensor(NP,Nch,NF);
-    Sn = double_tensor(NP,Nch,NF);
-    DH = double_tensor(NP,Nch,NF);
-    
-    TF = (double*)malloc(sizeof(double)* (NF));
-    PF = (double*)malloc(sizeof(double)* (NF));
-    AF = (double*)malloc(sizeof(double)* (NF));
-    
-    double phic, tc;
-    
+    Pp = double_tensor(NParams,Nch,NF);
+    Cs = double_tensor(NParams,Nch,NF);
+    Sn = double_tensor(NParams,Nch,NF);
+    DH = double_tensor(NParams,Nch,NF);
+        
     // reference amplitude and phase
     fullphaseamp(dat, ll, NF, params, FF, Ar[0], Ar[1], Pr[0], Pr[1]);
     
     // perturbed amplitude and phase
-    for(i = 0; i < NP; i++) fullphaseamp(dat, ll, NF, dparams[i], FF, Ap[i][0], Ap[i][1], Pp[i][0], Pp[i][1]);
+    for(i = 0; i < NParams; i++) fullphaseamp(dat, ll, NF, dparams[i], FF, Ap[i][0], Ap[i][1], Pp[i][0], Pp[i][1]);
     
     
     // phase difference vs frequency and ampltide ratio vs frequency
-    for(i = 0; i < NP; i++)
+    for(i = 0; i < NParams; i++)
     {
         for(id = 0; id < Nch; id++)
         {
@@ -186,7 +206,7 @@ void het_space(struct Data *dat, struct Het *het, int ll, double *params, double
       for(j = 0; j < NF; j++)
         {
         fprintf(out, "%e ", FF[j]);
-        for(i = 0; i < NP; i++) fprintf(out, "%e %e %e ", Cs[i][0][j], Sn[i][0][j], DH[i][0][j]);
+        for(i = 0; i < NParams; i++) fprintf(out, "%e %e %e ", Cs[i][0][j], Sn[i][0][j], DH[i][0][j]);
         fprintf(out, "\n");
         }
         
@@ -223,7 +243,7 @@ void het_space(struct Data *dat, struct Het *het, int ll, double *params, double
            
             for(id = 0; id < Nch; id++)
               {
-                  for(i = 0; i < NP; i++)
+                  for(i = 0; i < NParams; i++)
                   {
                       cmid = (Cs[i][id][jmin]*(FF[j]-FF[jmid])+ Cs[i][id][j]*(FF[jmid]-FF[jmin]))/(FF[j]-FF[jmin]);
                       smid = (Sn[i][id][jmin]*(FF[j]-FF[jmid])+ Sn[i][id][j]*(FF[jmid]-FF[jmin]))/(FF[j]-FF[jmin]);
@@ -256,14 +276,18 @@ void het_space(struct Data *dat, struct Het *het, int ll, double *params, double
         
     
     if(pflag == 1)
-       {
-       out = fopen("df.dat","w");
-       for (i = 0; i < M; ++i)
-       {
-           fprintf(out,"%e %e\n", fgrid[i], fgrid[i+1]-fgrid[i]);
-       }
-       fclose(out);
-       }
+    {
+        sprintf(outFile,"df_%.1e.dat",params[5]);
+        out = fopen(outFile,"w");
+        fprintf(out,"#");
+        for (i = 0; i < NParams; ++i) fprintf(out,"%lg ",params[i]);
+        fprintf(out,"\n");
+        for (i = 0; i < M; ++i)
+        {
+            fprintf(out,"%e %e\n", fgrid[i], fgrid[i+1]-fgrid[i]);
+        }
+        fclose(out);
+    }
 
     
     for (i = 0; i < N/2; ++i) dfa[i] = 1.0/dat->Tobs;
@@ -357,12 +381,18 @@ void het_space(struct Data *dat, struct Het *het, int ll, double *params, double
     
     if(pflag == 1)
     {
-     out = fopen("df_flat.dat","w");
-     for (i = 0; i < ii; ++i)
-     {
-         fprintf(out,"%e %e\n", (double)(fgflat[i])/dat->Tobs, (double)(fgflat[i+1]-fgflat[i])/dat->Tobs);
-     }
-     fclose(out);
+        sprintf(outFile,"df_flat_%.1e.dat",params[5]);
+        out = fopen(outFile,"w");
+        
+        fprintf(out,"#");
+        for (i = 0; i < NParams; ++i) fprintf(out,"%lg ",params[i]);
+        fprintf(out,"\n");
+        
+        for (i = 0; i < ii; ++i)
+        {
+            fprintf(out,"%e %e\n", (double)(fgflat[i])/dat->Tobs, (double)(fgflat[i+1]-fgflat[i])/dat->Tobs);
+        }
+        fclose(out);
     }
     
     
@@ -379,41 +409,38 @@ void het_space(struct Data *dat, struct Het *het, int ll, double *params, double
     
         het->MN = fgflat[0];
         het->MM = fgflat[M-1]+1;
-
+    
+    //store min and max frequency in MBH_Data structure
+    dat->fmin = (double)het->MN/dat->Tobs;
+    dat->fmax = (double)het->MM/dat->Tobs;
     
     free(FF);
-    free(TF);
-    free(PF);
-    free(AF);
 
     free_int_vector(fgflat);
     free_double_vector(dfa);
-    //free_double_vector(ratio);
-    //free_int_vector(stst);
-    free_double_matrix(dparams,NP);
-    free_double_matrix(fisher,NP);
-    free_double_matrix(evec,NP);
+    free_double_matrix(dparams,NParams);
+    free_double_matrix(fisher,NParams);
+    free_double_matrix(evec,NParams);
     free_double_vector(eval);
     free_double_vector(px);
     free_double_vector(fgrid);
     free_double_matrix(Ar,Nch);
-    free_double_tensor(Ap,NP,Nch);
+    free_double_tensor(Ap,NParams,Nch);
     free_double_matrix(Pr,Nch);
-    free_double_tensor(Pp,NP,Nch);
-    free_double_tensor(Cs,NP,Nch);
-    free_double_tensor(Sn,NP,Nch);
-    free_double_tensor(DH,NP,Nch);
+    free_double_tensor(Pp,NParams,Nch);
+    free_double_tensor(Cs,NParams,Nch);
+    free_double_tensor(Sn,NParams,Nch);
+    free_double_tensor(DH,NParams,Nch);
     
 }
 
-void fullphaseamp(struct Data *dat, int ll, int K, double *params, double *freq, double *Aamp, *Eamp, *Aphase, *Ephase)
+void fullphaseamp(struct MBH_Data *dat, int ll, int K, double *params, double *freq, double *Aamp, double *Eamp, double *Aphase, double *Ephase)
 {
     // full frequency template, amplitude and phase
     
     int i;
     double tc, phic, kxm;
     double *TF, *PF, *AF;
-    FILE *out;
     
     TF = (double*)malloc(sizeof(double)* (K));
     PF = (double*)malloc(sizeof(double)* (K));
@@ -438,7 +465,7 @@ void fullphaseamp(struct Data *dat, int ll, int K, double *params, double *freq,
     
 }
 
-void antennaphaseamp(struct Data *dat, int ll, double *params)
+void antennaphaseamp(struct MBH_Data *dat, int ll, double *params)
 {
     // antenna pattern modulation of the amplitude and phase
     
@@ -468,7 +495,7 @@ void antennaphaseamp(struct Data *dat, int ll, double *params)
     // reference amplitude and phase
     Intrinsic(ll, params, dat->Tobs, K, FF, TF, PF, AF);
     
-    Antenna(params, dat->Tstart, dat->Tend, K, FF, TF, Aamp, Eamp, Aphase, Ephase);
+    Antenna(params, K, FF, TF, Aamp, Eamp, Aphase, Ephase);
     
     out = fopen("ft_ant.dat","w");
     for(i=0; i< K; i++)
@@ -488,11 +515,11 @@ void antennaphaseamp(struct Data *dat, int ll, double *params)
 }
 
 // Just the antenna pattern contributions to the phase and amplitude evolution
-void Antenna(double *params, double Tstart, double Tend, int NF, double *FF, double *TF, double *AAmp, double *EAmp, double *APhase, double *EPhase)
+void Antenna(double *params, int NF, double *FF, double *TF, double *AAmp, double *EAmp, double *APhase, double *EPhase)
 {
     
     /*   Indicies   */
-    int i,j, k, n, m;
+    int n;
     
     /*   Time and distance variables   */
     double *xi;
@@ -501,21 +528,19 @@ void Antenna(double *params, double Tstart, double Tend, int NF, double *FF, dou
     double paold, peold;
     double ja, je;
     
-    /*   Miscellaneous  */
-    double xm, fstep, power, om, mx, tx, x;
     
-    double *ta, *xia;
+
     double *FpAR, *FcAR, *FpER, *FcER;
     double *FpAI, *FcAI, *FpEI, *FcEI;
     
-    double t, f, kdotx, Amp, Phase, RR, II;
+    double t, f, kdotx, RR, II;
     
-    int NA, flag;
+
     
-    double iota, cosi;
+    double cosi;
     double Aplus, Across;
     
-    double Tcut;
+
     
     xi = (double*)malloc(sizeof(double)* (NF));
     FpAR = (double*)malloc(sizeof(double)* (NF));
@@ -637,21 +662,18 @@ void freehet(struct Het *het)
     free_double_vector(het->DD);
 }
 
-void heterodyne(struct Data *dat, struct Het *het, int ll, double *params)
+void heterodyne(struct MBH_Data *dat, struct Het *het, int ll, double *params)
 {
     int i, id, j, k, n;
-    double f, fstop, x, y, z;
+    double x;
     double **hb, **rb, **ampb, **phaseb;
     double cp, sp;
     double Tobs;
     double **RC, **RS, **AA;
     double **DC, **DS;
     double logL, HH, HR;
-    double kxm;
-    double phic, tc, dt;
-    int M, N, MM, MN, NR, ds, J, U;
+    int M, N, MM, MN, NR, J, U;
     int Nch = het->Nch;
-    FILE *out;
     
     M = het->M;
     MM = het->MM;
@@ -676,11 +698,11 @@ void heterodyne(struct Data *dat, struct Het *het, int ll, double *params)
     het->ls = double_tensor(NR,Nch,J+1);
     het->ldc = double_tensor(NR,Nch,J+1);
     het->lds = double_tensor(NR,Nch,J+1);
-    het->pref = double_vector(NP);  // keep a copy of the source parameters used for the heterodyne
+    het->pref = double_vector(NParams);  // keep a copy of the source parameters used for the heterodyne
     het->logLR = double_vector(Nch); // reference likelihood in each channel
     het->DD = double_vector(Nch); // data inner product (used when fitting noise level)
     
-    for(j = 0; j < NP; j++) het->pref[j] = params[j];
+    for(j = 0; j < NParams; j++) het->pref[j] = params[j];
     
     hb = double_matrix(Nch,N);
     rb = double_matrix(Nch,N);
@@ -718,7 +740,7 @@ void heterodyne(struct Data *dat, struct Het *het, int ll, double *params)
     
       for(id = 0; id < Nch; id++)
         {
-        for (i = 1; i < MM; ++i)
+        for (i = MN; i < MM; ++i)
         {
             hb[id][i] = ampb[id][i]*cos(phaseb[id][i]);
             hb[id][N-i] = ampb[id][i]*sin(phaseb[id][i]);
@@ -756,6 +778,7 @@ void heterodyne(struct Data *dat, struct Het *het, int ll, double *params)
     
     logL = 0.0;
     x = 0.0;
+    //TODO: check hb, rb, SN
     for(id = 0; id < Nch; id++)
     {
         HH = fourier_nwip2(hb[id], hb[id], dat->SN[id], MN, MM, N);
@@ -769,7 +792,7 @@ void heterodyne(struct Data *dat, struct Het *het, int ll, double *params)
     
     het->SNR = sqrt(x);
     
-    printf("ref logL = %e\n", logL);
+    //printf("ref logL = %e\n", logL);
     
     for(id = 0; id < Nch; id++)
        {
@@ -783,10 +806,9 @@ void heterodyne(struct Data *dat, struct Het *het, int ll, double *params)
          }
        }
 
-    
     for(id = 0; id < Nch; id++)
     {
-      for(j = 1; j < MM; j++)
+      for(j = MN; j < MM; j++)
       {
         cp = cos(phaseb[id][j]);
         sp = sin(phaseb[id][j]);
@@ -915,20 +937,16 @@ void heterodyne(struct Data *dat, struct Het *het, int ll, double *params)
 }
 
 
-double log_likelihood_het(struct Data *dat, struct Het *het, int ll, double *params, double *sx)
+double log_likelihood_het(struct MBH_Data *dat, struct Het *het, int ll, double *params, double *sx)
 {
     double **amp, **phase;
     double **hc, **hs;
     double HH, HR, logL;
-    double x, y;
-    double L0,L1;
     double **cc, **ss;
     double *uu, *vv;
     int i, j, k, id, M, J, NR;
     int Nch = het->Nch;
-    
-    FILE *out;
-    
+        
     logL = 0.0;
     
     if(lhold == 0)
@@ -1080,23 +1098,21 @@ double log_likelihood_het(struct Data *dat, struct Het *het, int ll, double *par
     
 }
 
-double Fstat_het(struct Data *dat, struct Het *het, int ll, double *params, double *sx, double tm)
+double Fstat_het(struct MBH_Data *dat, struct Het *het, int ll, double *params, double *sx, double tm)
 {
     double ***amp, ***phase;
     double **Fparams;
-    double HH, HR, logL;
+    double logL;
     double cosi, scale, psi, phic, Ac, Ap, A;
     double x, y, u, v;
     double QQ;
-    double L0,L1,tx;
+    double tx;
     double ***cc, ***ss;
     double *uu, *vv;
     int i, j, k, id, M, J, NR;
     int ii, jj;
     int Nch = het->Nch;
-    
-    FILE *out;
-    
+        
     logL = 0.0;
     
     if(lhold == 0)
@@ -1106,7 +1122,7 @@ double Fstat_het(struct Data *dat, struct Het *het, int ll, double *params, doub
     J = het->J;
     NR = het->NR;
 
-    Fparams = double_matrix(4,NP);
+    Fparams = double_matrix(4,NParams);
     amp = double_tensor(4,Nch,M);
     phase = double_tensor(4,Nch,M);
         
@@ -1119,7 +1135,7 @@ double Fstat_het(struct Data *dat, struct Het *het, int ll, double *params, doub
         
     for(i = 0; i < 4; i++)
       {
-          for(j = 0; j < NP; j++) Fparams[i][j] = params[j];
+          for(j = 0; j < NParams; j++) Fparams[i][j] = params[j];
           Fparams[i][10] = 0.0;
       }
         
@@ -1390,426 +1406,11 @@ double Fstat_het(struct Data *dat, struct Het *het, int ll, double *params, doub
     
 }
 
-// Uses the full data (slow)
-void FstatFull(struct Data *dat, int ll, double *params, double *pnew)
-{
-    
-    /*   Indicies   */
-    int i,j, k, n, m, imax;
-    
-    /*   Miscellaneous  */
-    double xm, fstep, power, om, mx, tx;
-    
-    double *pfilt;
-    
-    double **filtA, **filtE;
-    
-    double **MM, **MI;
-    
-    double *NV, *aV;
-    
-    double AR, AI, ER, EI;
-    
-    double t, f, kdotx, Amp, Phase, Fp, Fc;
-    
-    double A, P, px, tc, tcs, pxi, pxj;
-    
-    double x, y, u, v, xold, yold;
-    
-    double cp, sp;
-    
-    int NA, flag;
-    
-    double cx, sx, logL, logLmax;
-    
-    int nn;
-    
-    double iota, cosi;
-    double Ap, Ac, scale;
-    
-    double a1, a2, a3, a4;
-    double cpsi, spsi;
-    double psi, phic;
-    double cpc, spc;
-    
-    FILE *out;
-    
-    
-    clock_t start, end;
-    double cpu_time_used;
-    
-    pfilt = (double*)malloc(sizeof(double)* (NP));
-    
-    filtA = double_matrix(4,dat->N);
-    filtE = double_matrix(4,dat->N);
-    
-    NV = (double*)malloc(sizeof(double)* (4));
-    aV = (double*)malloc(sizeof(double)* (4));
-    MM = double_matrix(4,4);
-    MI = double_matrix(4,4);
-    
-    for (i=0; i< NP; i++) pfilt[i] = params[i];
-    
-    // [0] ln(Mass1)  [1] ln(Mass2)  [2] Spin1 [3] Spin2 [4] phic [5] tc [6] ln(distance)
-       // [7] EclipticCoLatitude, [8] EclipticLongitude  [9] polarization, [10] inclination
-    
-    pfilt[10] = 0.0;
-    
-    pfilt[4] = 0.0;
-    pfilt[9] = 0.0;
-    ResponseFreq(dat, ll, pfilt, filtA[0], filtE[0]);
-    
-    
-    pfilt[4] = 0.0;
-    pfilt[9] = PI/4.0;
-    ResponseFreq(dat, ll, pfilt, filtA[1], filtE[1]);
-    
-    
-    pfilt[4] = PI/4.0;
-    pfilt[9] = 0.0;
-    ResponseFreq(dat, ll, pfilt, filtA[2], filtE[2]);
-    
-    
-    pfilt[4] = PI/4.0;
-    pfilt[9] = PI/4.0;
-    ResponseFreq(dat, ll, pfilt, filtA[3], filtE[3]);
-    
-    
-    for (i=0; i< dat->N; i++)
-    {
-        filtA[1][i] *= -1.0;
-        filtE[1][i] *= -1.0;
-        filtA[2][i] *= -1.0;
-        filtE[2][i] *= -1.0;
-    }
-    
-   //printf("\n");
-        for (i=0; i< 4; i++)
-        {
-            NV[i] = 2.0*(fourier_nwip(filtA[i], dat->data[0], dat->SN[0], dat->N) + fourier_nwip(filtE[i], dat->data[1], dat->SN[1], dat->N));
-            for (j=i; j< 4; j++)
-            {
-                MM[i][j] =  4.0*(fourier_nwip(filtA[i], filtA[j], dat->SN[0], dat->N) + fourier_nwip(filtE[i], filtE[j], dat->SN[1], dat->N));
-                //printf("%e ", MM[i][j]);
-            }
-            //printf("\n");
-        }
-        
-        for (i=0; i< 4; i++)
-        {
-            for (j=i; j< 4; j++)
-            {
-                MM[j][i] = MM[i][j];
-            }
-        }
-        
-        // a small stabilizer
-        for (i=0; i< 4; i++) MM[i][i] += 0.1;
-        
-        Inverse(MM, MI, 4);
-        
-        logL = 0.0;
-        
-        for (i=0; i< 4; i++)
-        {
-            aV[i] = 0.0;
-            for (j=0; j< 4; j++)
-            {
-                aV[i] += MI[i][j]*NV[j];
-                logL += 0.5*MI[i][j]*NV[i]*NV[j];
-            }
-        }
-        
-        printf("Fstat %e %f\n", logL, sqrt(2.0*logL));
-        
-        //printf("%e %e %e %e\n", aV[0], aV[1], aV[2], aV[3]);
-        
-        x = (aV[0]+aV[3]);
-        x = x*x;
-        y = (aV[1]-aV[2]);
-        y = y*y;
-        u = (aV[0]-aV[3]);
-        u = u*u;
-        v = (aV[1]+aV[2]);
-        v = v*v;
-    
-    x = (aV[0]+aV[3]);
-    x = x*x;
-    y = (aV[1]-aV[2]);
-    y = y*y;
-    u = (aV[0]-aV[3]);
-    u = u*u;
-    v = (aV[1]+aV[2]);
-    v = v*v;
-        
-        Ap = sqrt(x+y)+sqrt(u+v);
-        Ac = sqrt(x+y)-sqrt(u+v);
-        A = Ap + sqrt(Ap*Ap-Ac*Ac);
-        
-        x = atan2((aV[1]-aV[2]),(aV[0]+aV[3]));
-        
-        y = atan2(-(aV[1]+aV[2]),(aV[0]-aV[3]));
-        
-        psi = 0.25*(y-x);
-        while(psi < 0.0) psi += PI;
-        while(psi > PI) psi -= PI;
-        
-        
-        phic = 0.25*(x+y);
-        while(phic < 0.0) phic += PI;
-        while(phic > PI) phic -= PI;
-        
-        cosi = Ac/A;
-        
-        scale = 2.0/A;
-        
-       printf("%f %f %f %f %f %f %f %f %f\n", scale, x, y, phic, psi, cosi, params[4], params[9], params[10]);
-    
-       // maxed on data without noise get
-       // scale = 0.996465 phic = 2.837624 psi =  2.930106 cosi = 0.339382
-        // maxed on data with noise get
-        // scale = 0.992009 phic = 2.835180 psi = 2.927718 cosi = 0.337941
-    
-        // reference values
-        // 1 2.848705 2.937147 0.339386
-    
-      for (i=0; i< NP; i++) pnew[i] = params[i];
-    
-        pnew[10] = cosi;
-        pnew[6] += log(scale);
-        pnew[9] = psi;
-        pnew[4] = phic;
-
-    /*   Deallocate Arrays   */
-    
-     free(NV);
-     free(aV);
-     free_double_matrix(MM,4);
-     free_double_matrix(MI,4);
-     free_double_matrix(filtA,4);
-     free_double_matrix(filtE,4);
-    
-    
-    
-    return;
-}
-
-
-
-
-
-double SNRFast(struct Data *dat, int ll, double *params)
-{
-    double *AAmp, *EAmp, *APhase, *EPhase;
-    double af, fr, df, DT, fac, deltaF, f, fmax, fmin, x, y, t, t10;
-    double m1, m2, chi1, chi2, Mtot, Mc, eta;
-    double Amp, Phase, tf, fguess, kxm;
-    double m1_SI, m2_SI, distance, tc, phic;
-    int i, j, NF, NW, flag;
-    double A, P;
-    double SNR;
-    double px, fnew;
-    double *Aint, *Eint;
-    double *SNRSQA, *SNRSQE;
-
-    FILE *out;
-    
-    int NFmax = 100000;
- 
-    double *AF, *PF, *FF, *TF;
-    
-    //clock_t start, end;
-    //double cpu_time_used;
-    
-    FF = (double*)malloc(sizeof(double)* (NFmax));
-    
-    SetUp(dat, ll, params, NFmax, &NF, FF);
-                         
-    AF = (double*)malloc(sizeof(double)* (NF));
-    PF = (double*)malloc(sizeof(double)* (NF));
-    TF = (double*)malloc(sizeof(double)* (NF));
-    
-    Intrinsic(ll, params, dat->Tobs, NF, FF, TF, PF, AF);
-    
-    AAmp = (double*)malloc(sizeof(double)* (NF));
-    EAmp = (double*)malloc(sizeof(double)* (NF));
-    APhase = (double*)malloc(sizeof(double)* (NF));
-    EPhase = (double*)malloc(sizeof(double)* (NF));
-                         
-    Extrinsic(params, dat->Tstart, dat->Tend, NF, FF, TF, PF, AF, AAmp, EAmp, APhase, EPhase, &kxm);
-    
-    Aint = (double*)malloc(sizeof(double)* (NF));
-    Eint = (double*)malloc(sizeof(double)* (NF));
-    
-    out = fopen("intg.dat","w");
-    for (i=0; i< NF; i++)
-    {
-        j = (int)(FF[i]*dat->Tobs);
-        //printf("%d %d\n", i, j);
-        Aint[i] = 4.0*AAmp[i]*AAmp[i]/dat->SM[0][j];
-        Eint[i] = 4.0*EAmp[i]*EAmp[i]/dat->SM[1][j];
-        fprintf(out,"%e %e %e %e\n", TF[i], FF[i], Aint[i], Eint[i]);
-    }
-    fclose(out);
-     
-    
-    gsl_interp_accel *AAacc = gsl_interp_accel_alloc();
-    gsl_spline *AAspline = gsl_spline_alloc (gsl_interp_cspline, NF);
-    gsl_spline_init(AAspline, FF, AAmp, NF);
-    
-    gsl_interp_accel *AEacc = gsl_interp_accel_alloc();
-    gsl_spline *AEspline = gsl_spline_alloc (gsl_interp_cspline, NF);
-    gsl_spline_init(AEspline, FF, EAmp, NF);
-    
-    gsl_interp_accel *IAacc = gsl_interp_accel_alloc();
-    gsl_spline *IAspline = gsl_spline_alloc (gsl_interp_cspline, NF);
-    gsl_spline_init(IAspline, FF, Aint, NF);
-    
-    gsl_interp_accel *IEacc = gsl_interp_accel_alloc();
-    gsl_spline *IEspline = gsl_spline_alloc (gsl_interp_cspline, NF);
-    gsl_spline_init(IEspline, FF, Eint, NF);
-    
-    SNR = gsl_spline_eval_integ(IAspline, FF[0], FF[NF-1], IAacc)+gsl_spline_eval_integ(IEspline, FF[0], FF[NF-1], IEacc);
-    SNR *= dat->Tobs;
-    SNR = sqrt(SNR);
-    printf("SNR = %e SNRsq = %e\n", SNR, SNR*SNR);
-    
-    /*
-     
-     // This section is used to get SNR versus time
-    
-    SNRSQA = (double*)malloc(sizeof(double)* (NF));
-    SNRSQE = (double*)malloc(sizeof(double)* (NF));
-    
-    SNRSQA[0] = 0.0;
-    SNRSQE[0] = 0.0;
-    for (i=1; i< NF; i++)
-    {
-     SNRSQA[i] = SNRSQA[i-1]+gsl_spline_eval_integ(IAspline, FF[i-1], FF[i], IAacc);
-     SNRSQE[i] = SNRSQE[i-1]+gsl_spline_eval_integ(IEspline, FF[i-1], FF[i], IEacc);
-    }
-    
-    double SnrA, SnrE, SAT, SET, tmin, tmax;
-    
-    SnrA = SNRSQA[NF-1];
-    SnrE = SNRSQE[NF-1];
-    
-    SNR = sqrt(SnrA+SnrE);
-    
-    printf("SNR = %e SNRsq = %e\n", SNR, SNR*SNR);
-    
-    //printf("%f %f %e\n", SnrA, SnrE, SNRSQA[NF-1]+SNRSQE[NF-1]);
-
-    gsl_interp_accel *SAacc = gsl_interp_accel_alloc();
-    gsl_spline *SAspline = gsl_spline_alloc (gsl_interp_cspline, NF);
-    gsl_spline_init(SAspline, TF, SNRSQA, NF);
-    
-    gsl_interp_accel *SEacc = gsl_interp_accel_alloc();
-    gsl_spline *SEspline = gsl_spline_alloc (gsl_interp_cspline, NF);
-    gsl_spline_init(SEspline, TF, SNRSQE, NF);
-    
-    
-    NW = (int)(dat->Tobs/1000.0);
-    tmin = TF[0];
-    tmax = TF[NF-1];
-    out = fopen("SNRofT.dat","w");
-    
-    flag = 0;
-    
-    for (i=1; i< NW; i++)
-    {
-        t = tmin+(double)(i)*1000.0;
-        SAT = SnrA;  // make sure we get to the final value
-        SET = SnrE;
-        if(t < tmax)
-        {
-            SAT = gsl_spline_eval (SAspline, t, SAacc);
-            SET = gsl_spline_eval (SEspline, t, SEacc);
-        }
-        
-        x = sqrt(SAT+SET);
-        
-        if(x > 10.0 && flag == 0)
-        {
-            flag = 1;
-            y = t;
-        }
-        
-        fprintf(out,"%e %e %e %e\n", t, x, sqrt(SAT), sqrt(SET));
-    }
-    fclose(out);
-    
-    t10 = y;
-    
-    if(flag == 1)
-    {
-    // refine estimate of when SNR = 10 is reached
-    
-    flag = 0;
-    
-    for (i=-1000; i< 1000; i++)
-    {
-        t = y+(double)(i);
-        
-        SAT = SnrA;  // make sure we get to the final value
-        SET = SnrE;
-        if(t < tmax)
-        {
-            SAT = gsl_spline_eval (SAspline, t, SAacc);
-            SET = gsl_spline_eval (SEspline, t, SEacc);
-        }
-        
-        x = sqrt(SAT+SET);
-        
-        if(x > 10.0 && flag == 0)
-        {
-            flag = 1;
-            t10 = t;
-        }
-        
-    }
- 
-    
-    printf("SNR=10 at t = %e, tc-t = %e\n", t10, params[5]-t10);
-     
-    }
-    
-    
-    free(SNRSQA);
-    free(SNRSQE);
-     
-     */
-     
-     
-    free(Aint);
-    free(Eint);
-    free(AAmp);
-    free(EAmp);
-    free(APhase);
-    free(EPhase);
-    free(FF);
-    free(TF);
-    free(AF);
-    free(PF);
-    
-    gsl_spline_free(IAspline);
-    gsl_spline_free(IEspline);
-    gsl_spline_free(AAspline);
-    gsl_spline_free(AEspline);
-    gsl_interp_accel_free(IAacc);
-    gsl_interp_accel_free(IEacc);
-    gsl_interp_accel_free(AAacc);
-    gsl_interp_accel_free(AEacc);
-    
-    return(SNR);
-    
-}
-
 void Extrinsic(double *params, double Tstart, double Tend, int NF, double *FF, double *TF, double *PF, double *AF, double *AAmp, double *EAmp, double *APhase, double *EPhase, double *kxm)
 {
     
     /*   Indicies   */
-    int i,j, k, n, m;
+    int n;
     
     /*   Time and distance variables   */
     double *xi;
@@ -1819,26 +1420,16 @@ void Extrinsic(double *params, double Tstart, double Tend, int NF, double *FF, d
     double ja, je;
     
     /*   Miscellaneous  */
-    double xm, fstep, power, om, mx, tx, x;
+    double x;
     
-    double *ta, *xia;
     double *FpAR, *FcAR, *FpER, *FcER;
     double *FpAI, *FcAI, *FpEI, *FcEI;
     
     double t, f, kdotx, Amp, Phase, RR, II;
-    
-    int NA, flag;
-    
-    double iota, cosi;
+        
+    double cosi;
     double Aplus, Across;
-    
-    double Tcut;
-    
-    clock_t start, end;
-    double cpu_time_used;
-    
-    FILE *out;
-    
+        
     
     xi = (double*)malloc(sizeof(double)* (NF));
     FpAR = (double*)malloc(sizeof(double)* (NF));
@@ -1963,34 +1554,35 @@ void Extrinsic(double *params, double Tstart, double Tend, int NF, double *FF, d
     free(FcEI);
     free(FpEI);
     
-    return;
 }
 
 
-void SetUp(struct Data *dat, int ll, double *params, int NFmax, int *NFS, double *FF)
+void SetUp(struct MBH_Data *dat, int ll, double *params, int *NFS, double *FF)
 {
-    double af, fr, df, DT, fac, deltaF, f, fmax, fmin, x;
-    double m1, m2, chi1, chi2, Mtot, Mc, eta, dm;
-    double Amp, Phase, tf, fguess;
-    double m1_SI, m2_SI, distance, tc, phic, told;
-    int i, ii, NF;
-    double A, P;
-    double px, fnew, fonfs;
-    double t, tx;
+    double fr, df, DT, fac, f, fmax, fmin;
+    double m1, m2,Mtot, Mc, eta;
+    double distance, tc;
+    int i, NF;
     double dfmin, dfmax;
-    
-    double fRef_in=PDfref;
-    
-    int ret, flag, flag1, flag2;
+        
+    int flag;
     
     // This subroutine sets up the frequency sample array, the time-frequency map and finds the PhenomD amplitude and phase
     
     // NFmax is the size of the holder arrays. NFS is the actual size.
     
+//    distance = params[6]*1.0e9*PC_SI; // distance
+//    get_component_masses(params, ll, &m1, &m2);
+//    m1*=Tsun;
+//    m2*=Tsun;
+//    Mtot = (m1+m2);
+//    eta = m1*m2/((m1+m2)*(m1+m2));
+//    Mc = pow(m1*m2,3.0/5.0)/pow(m1+m2,1.0/5.0);
+    double dm;
     if(ll == 0)  // linear in m1, m2
     {
-    m1 = params[0]*TSUN;    // Mass1
-    m2 = params[1]*TSUN;    // Mass2
+    m1 = params[0]*Tsun;    // Mass1
+    m2 = params[1]*Tsun;    // Mass2
     distance = params[6]*1.0e9*PC_SI; // distance
     Mtot = (m1+m2);
     eta = m1*m2/((m1+m2)*(m1+m2));
@@ -1998,8 +1590,8 @@ void SetUp(struct Data *dat, int ll, double *params, int NFmax, int *NFS, double
     }
     else if(ll == 1)  // log in m1, m2
     {
-     m1 = exp(params[0])*TSUN;    // Mass1
-     m2 = exp(params[1])*TSUN;    // Mass2
+     m1 = exp(params[0])*Tsun;    // Mass1
+     m2 = exp(params[1])*Tsun;    // Mass2
      distance = exp(params[6])*1.0e9*PC_SI; // distance
      Mtot = (m1+m2);
      eta = m1*m2/((m1+m2)*(m1+m2));
@@ -2008,8 +1600,8 @@ void SetUp(struct Data *dat, int ll, double *params, int NFmax, int *NFS, double
     else // log in Mc, Mt
     {
     distance = exp(params[6])*1.0e9*PC_SI; // distance
-    Mc = exp(params[0])*TSUN;
-    Mtot = exp(params[1])*TSUN;
+    Mc = exp(params[0])*Tsun;
+    Mtot = exp(params[1])*Tsun;
     eta = pow((Mc/Mtot), (5.0/3.0));
      if(eta > 0.25)
      {
@@ -2112,18 +1704,14 @@ void SetUp(struct Data *dat, int ll, double *params, int NFmax, int *NFS, double
 
 
 // This uses the smooth component of the power spectra
-void FisherFast(struct Data *dat, int ll, double *params, double **Fisher)
+void FisherFast(struct MBH_Data *dat, int ll, double *params, double **Fisher)
 {
     double *AAmp, *EAmp, *APhase, *EPhase, *TF, *FF, *PF, *AF;
     double *PFref, *AFref, *TFref;
-    double af, fr, df, DT, fac, deltaF, f, fmin, x, t;
-    double m1, m2, chi1, chi2, Mtot, Mc, eta;
-    double Amp, Phase, tf, fguess;
-    double m1_SI, m2_SI, distance, tc, phic;
+    double x;
     double *paramsP, *paramsM;
-    int i, j, k, ii, NF, NW, lx;
-    double A, P;
-    double px, fnew, kxm;
+    int i, j, k, NF;
+    double kxm;
     double *Aint, *Eint, *SADS, *SEDS;
     double *AphaseP, *AphaseM, *AampP, *AampM;
     double *EphaseP, *EphaseM, *EampP, *EampM;
@@ -2133,20 +1721,18 @@ void FisherFast(struct Data *dat, int ll, double *params, double **Fisher)
     double Tstart, Tend, Tobs;
     
     int NFmax = 100000;
-    
-    int kmin, kmax, flag;
-    
+        
     Tstart = dat->Tstart;
     Tend = dat->Tend;
     Tobs = dat->Tobs;
     
-    epsilon = (double*)malloc(sizeof(double)* (NP));
-    paramsP = (double*)malloc(sizeof(double)* (NP));
-    paramsM = (double*)malloc(sizeof(double)* (NP));
+    epsilon = (double*)malloc(sizeof(double)* (NParams));
+    paramsP = (double*)malloc(sizeof(double)* (NParams));
+    paramsM = (double*)malloc(sizeof(double)* (NParams));
     
     FF = (double*)malloc(sizeof(double)* (NFmax));
     
-    SetUp(dat, ll, params, NFmax, &NF, FF);
+    SetUp(dat, ll, params, &NF, FF);
     
     AF = (double*)malloc(sizeof(double)* (NF));
     PF = (double*)malloc(sizeof(double)* (NF));
@@ -2190,11 +1776,11 @@ void FisherFast(struct Data *dat, int ll, double *params, double **Fisher)
     EampP = (double*)malloc(sizeof(double)* (NF));
     EampM = (double*)malloc(sizeof(double)* (NF));
     
-    DphaseA = double_matrix(NP, NF);
-    DampA = double_matrix(NP, NF);
+    DphaseA = double_matrix(NParams, NF);
+    DampA = double_matrix(NParams, NF);
     
-    DphaseE = double_matrix(NP, NF);
-    DampE = double_matrix(NP, NF);
+    DphaseE = double_matrix(NParams, NF);
+    DampE = double_matrix(NParams, NF);
  
     
     AAmp = (double*)malloc(sizeof(double)* (NF));
@@ -2227,7 +1813,7 @@ void FisherFast(struct Data *dat, int ll, double *params, double **Fisher)
     for (i=0; i< 4; i++)
     {
         
-        for (j=0; j< NP; j++)
+        for (j=0; j< NParams; j++)
         {
             paramsP[j] = params[j];
             paramsM[j] = params[j];
@@ -2308,10 +1894,10 @@ void FisherFast(struct Data *dat, int ll, double *params, double **Fisher)
            }
 
 
-      for (i=7; i< NP; i++)
+      for (i=7; i< NParams; i++)
        {
     
-       for (j=0; j< NP; j++)
+       for (j=0; j< NParams; j++)
         {
         paramsP[j] = params[j];
         paramsM[j] = params[j];
@@ -2342,9 +1928,9 @@ void FisherFast(struct Data *dat, int ll, double *params, double **Fisher)
     gsl_spline *IEspline = gsl_spline_alloc (gsl_interp_cspline, NF);
 
     
-    for (i=0; i< NP; i++)
+    for (i=0; i< NParams; i++)
     {
-        for (j=i; j< NP; j++)
+        for (j=i; j< NParams; j++)
         {
   
             for (k=0; k< NF; k++)
@@ -2362,19 +1948,19 @@ void FisherFast(struct Data *dat, int ll, double *params, double **Fisher)
         
     }
     
-    for (i=0; i< NP; i++)
+    for (i=0; i< NParams; i++)
     {
-        for (j=i+1; j< NP; j++)
+        for (j=i+1; j< NParams; j++)
         {
             Fisher[j][i] =  Fisher[i][j];
         }
     }
     
     
-    free_double_matrix(DphaseA,NP);
-    free_double_matrix(DampA,NP);
-    free_double_matrix(DphaseE,NP);
-    free_double_matrix(DampE,NP);
+    free_double_matrix(DphaseA,NParams);
+    free_double_matrix(DampA,NParams);
+    free_double_matrix(DphaseE,NParams);
+    free_double_matrix(DampE,NParams);
  
     free(epsilon);
     free(SADS);
@@ -2416,20 +2002,15 @@ void FisherFast(struct Data *dat, int ll, double *params, double **Fisher)
     
 }
 
-void FisherHet(struct Data *dat, struct Het *het, int ll, double *params, double **Fisher)
+void FisherHet(struct MBH_Data *dat, struct Het *het, int ll, double *params, double **Fisher)
 {
-    double af, fr, df, DT, fac, deltaF, f, fmin, x, t;
-    double m1, m2, chi1, chi2, Mtot, Mc, eta;
-    double Amp, Phase, tf, fguess;
-    double m1_SI, m2_SI, distance, tc, phic;
+    double x;
     double *paramsP, *paramsM;
-    int i, j, k, ii, jj, kk, NF, NW, lx;
-    double A, P;
-    double px, fnew, kxm;
+    int i, j, k, ii, jj, kk;
     double *epsilon;
     double Tstart, Tend, Tobs;
 
-    int kmin, kmax, flag, Nch;
+    int Nch;
     
     int M, J, NR, id;
     double HH;
@@ -2450,16 +2031,16 @@ void FisherHet(struct Data *dat, struct Het *het, int ll, double *params, double
     Tend = dat->Tend;
     Tobs = dat->Tobs;
     
-    epsilon = (double*)malloc(sizeof(double)* (NP));
-    paramsP = (double*)malloc(sizeof(double)* (NP));
-    paramsM = (double*)malloc(sizeof(double)* (NP));
+    epsilon = (double*)malloc(sizeof(double)* (NParams));
+    paramsP = (double*)malloc(sizeof(double)* (NParams));
+    paramsM = (double*)malloc(sizeof(double)* (NParams));
     
     amp = double_matrix(Nch,M);
     phase = double_matrix(Nch,M);
-    ampP = double_tensor(NP,Nch,M);
-    phaseP = double_tensor(NP,Nch,M);
-    ampM = double_tensor(NP,Nch,M);
-    phaseM = double_tensor(NP,Nch,M);
+    ampP = double_tensor(NParams,Nch,M);
+    phaseP = double_tensor(NParams,Nch,M);
+    ampM = double_tensor(NParams,Nch,M);
+    phaseM = double_tensor(NParams,Nch,M);
     
     // Reference phase and amplitude
     fullphaseamp(dat, ll, M, params, het->freq, amp[0], amp[1], phase[0], phase[1]);
@@ -2481,10 +2062,10 @@ void FisherHet(struct Data *dat, struct Het *het, int ll, double *params, double
       epsilon[9] = 1.0e-5;
       epsilon[10] = 1.0e-5;
     
-    for (i=0; i< NP; i++)
+    for (i=0; i< NParams; i++)
     {
         
-        for (j=0; j< NP; j++)
+        for (j=0; j< NParams; j++)
         {
             paramsP[j] = params[j];
             paramsM[j] = params[j];
@@ -2530,14 +2111,14 @@ void FisherHet(struct Data *dat, struct Het *het, int ll, double *params, double
     }
 
 
-    for (i = 0; i < NP; i++)
+    for (i = 0; i < NParams; i++)
     {
-        for (j = 0; j < NP; j++) Fisher[i][j] = 0.0;
+        for (j = 0; j < NParams; j++) Fisher[i][j] = 0.0;
     }
     
-        for (i = 0 ; i < NP ; i++)
+        for (i = 0 ; i < NParams ; i++)
         {
-            for (j = i ; j < NP ; j++)
+            for (j = i ; j < NParams ; j++)
             {
                 
                 for (id = 0 ; id < Nch ; id++)  // loop over detectors
@@ -2587,9 +2168,9 @@ void FisherHet(struct Data *dat, struct Het *het, int ll, double *params, double
     }
 
 
-    for (i=0; i< NP; i++)
+    for (i=0; i< NParams; i++)
     {
-        for (j=i+1; j< NP; j++)
+        for (j=i+1; j< NParams; j++)
         {
             Fisher[j][i] =  Fisher[i][j];
         }
@@ -2606,29 +2187,24 @@ void FisherHet(struct Data *dat, struct Het *het, int ll, double *params, double
     
     free_double_matrix(amp,Nch);
     free_double_matrix(phase,Nch);
-    free_double_tensor(ampP,NP,Nch);
-    free_double_tensor(phaseP,NP,Nch);
-    free_double_tensor(ampM,NP,Nch);
-    free_double_tensor(phaseM,NP,Nch);
+    free_double_tensor(ampP,NParams,Nch);
+    free_double_tensor(phaseP,NParams,Nch);
+    free_double_tensor(ampM,NParams,Nch);
+    free_double_tensor(phaseM,NParams,Nch);
     
     
     
 }
 
-void FisherSubHet(struct Data *dat, struct Het *het, int ll, int *pmap, double *params, double **Fisher)
+void FisherSubHet(struct MBH_Data *dat, struct Het *het, int ll, int *pmap, double *params, double **Fisher)
 {
-    double af, fr, df, DT, fac, deltaF, f, fmin, x, t;
-    double m1, m2, chi1, chi2, Mtot, Mc, eta;
-    double Amp, Phase, tf, fguess;
-    double m1_SI, m2_SI, distance, tc, phic;
+    double x;
     double *paramsP, *paramsM;
-    int i, j, k, ii, jj, kk, NF, NW, lx;
-    double A, P;
-    double px, fnew, kxm;
+    int i,j,k,ii,jj,kk;
     double *epsilon;
     double Tstart, Tend, Tobs;
 
-    int kmin, kmax, flag, Nch;
+    int Nch;
     
     int M, J, NR, id;
     double HH;
@@ -2649,16 +2225,16 @@ void FisherSubHet(struct Data *dat, struct Het *het, int ll, int *pmap, double *
     Tend = dat->Tend;
     Tobs = dat->Tobs;
     
-    epsilon = (double*)malloc(sizeof(double)* (NP));
-    paramsP = (double*)malloc(sizeof(double)* (NP));
-    paramsM = (double*)malloc(sizeof(double)* (NP));
+    epsilon = (double*)malloc(sizeof(double)* (NParams));
+    paramsP = (double*)malloc(sizeof(double)* (NParams));
+    paramsM = (double*)malloc(sizeof(double)* (NParams));
     
     amp = double_matrix(Nch,M);
     phase = double_matrix(Nch,M);
-    ampP = double_tensor(NP,Nch,M);
-    phaseP = double_tensor(NP,Nch,M);
-    ampM = double_tensor(NP,Nch,M);
-    phaseM = double_tensor(NP,Nch,M);
+    ampP = double_tensor(NParams,Nch,M);
+    phaseP = double_tensor(NParams,Nch,M);
+    ampM = double_tensor(NParams,Nch,M);
+    phaseM = double_tensor(NParams,Nch,M);
     
     // Reference phase and amplitude
     fullphaseamp(dat, ll, M, params, het->freq, amp[0], amp[1], phase[0], phase[1]);
@@ -2680,12 +2256,12 @@ void FisherSubHet(struct Data *dat, struct Het *het, int ll, int *pmap, double *
       epsilon[9] = 1.0e-5;
       epsilon[10] = 1.0e-5;
     
-    for (i=0; i< NP; i++)
+    for (i=0; i< NParams; i++)
     {
         if(pmap[i] > -1)
          {
                    
-        for (j=0; j< NP; j++)
+        for (j=0; j< NParams; j++)
         {
             paramsP[j] = params[j];
             paramsM[j] = params[j];
@@ -2733,19 +2309,19 @@ void FisherSubHet(struct Data *dat, struct Het *het, int ll, int *pmap, double *
     }
 
 
-    for (i = 0; i < NP; i++)
+    for (i = 0; i < NParams; i++)
     {
         if(pmap[i] > -1)
             {
-        for (j = 0; j < NP; j++) if(pmap[j] > -1) Fisher[pmap[i]][pmap[j]] = 0.0;
+        for (j = 0; j < NParams; j++) if(pmap[j] > -1) Fisher[pmap[i]][pmap[j]] = 0.0;
             }
     }
     
-        for (i = 0 ; i < NP ; i++)
+        for (i = 0 ; i < NParams ; i++)
         {
             if(pmap[i] > -1)
             {
-            for (j = i ; j < NP ; j++)
+            for (j = i ; j < NParams ; j++)
             {
                 if(pmap[j] > -1)
                 {
@@ -2794,12 +2370,12 @@ void FisherSubHet(struct Data *dat, struct Het *het, int ll, int *pmap, double *
         }  // fi pmap[i] > -1
       }  // i loop
 
-    for (i=0; i< NP; i++)
+    for (i=0; i< NParams; i++)
        {
            if(pmap[i] > -1)
            {
                
-           for (j=i+1; j< NP; j++)
+           for (j=i+1; j< NParams; j++)
            {
                if(pmap[j] > -1)
                {
@@ -2820,28 +2396,24 @@ void FisherSubHet(struct Data *dat, struct Het *het, int ll, int *pmap, double *
     
     free_double_matrix(amp,Nch);
     free_double_matrix(phase,Nch);
-    free_double_tensor(ampP,NP,Nch);
-    free_double_tensor(phaseP,NP,Nch);
-    free_double_tensor(ampM,NP,Nch);
-    free_double_tensor(phaseM,NP,Nch);
+    free_double_tensor(ampP,NParams,Nch);
+    free_double_tensor(phaseP,NParams,Nch);
+    free_double_tensor(ampM,NParams,Nch);
+    free_double_tensor(phaseM,NParams,Nch);
     
     
     
 }
 
 
-void FisherSub(struct Data *dat, int ll, int *pmap, double *params, double **Fisher)
+void FisherSub(struct MBH_Data *dat, int ll, int *pmap, double *params, double **Fisher)
 {
     double *AAmp, *EAmp, *APhase, *EPhase, *TF, *FF, *PF, *AF;
     double *PFref, *AFref, *TFref;
-    double af, fr, df, DT, fac, deltaF, f, fmin, x, t;
-    double m1, m2, chi1, chi2, Mtot, Mc, eta;
-    double Amp, Phase, tf, fguess;
-    double m1_SI, m2_SI, distance, tc, phic;
+    double x;
     double *paramsP, *paramsM;
-    int i, j, k, ii, NF, NW;
-    double A, P;
-    double px, fnew, kxm;
+    int i, j, k, NF;
+    double kxm;
     double *Aint, *Eint, *SADS, *SEDS;
     double *AphaseP, *AphaseM, *AampP, *AampM;
     double *EphaseP, *EphaseM, *EampP, *EampM;
@@ -2851,20 +2423,18 @@ void FisherSub(struct Data *dat, int ll, int *pmap, double *params, double **Fis
     double Tstart, Tend, Tobs;
     
     int NFmax = 100000;
-    
-    int kmin, kmax, flag;
-    
+        
     Tstart = dat->Tstart;
     Tend = dat->Tend;
     Tobs = dat->Tobs;
 
-    epsilon = (double*)malloc(sizeof(double)* (NP));
-    paramsP = (double*)malloc(sizeof(double)* (NP));
-    paramsM = (double*)malloc(sizeof(double)* (NP));
+    epsilon = (double*)malloc(sizeof(double)* (NParams));
+    paramsP = (double*)malloc(sizeof(double)* (NParams));
+    paramsM = (double*)malloc(sizeof(double)* (NParams));
     
     FF = (double*)malloc(sizeof(double)* (NFmax));
     
-    SetUp(dat, ll, params, NFmax, &NF, FF);
+    SetUp(dat, ll, params, &NF, FF);
     
     AF = (double*)malloc(sizeof(double)* (NF));
     PF = (double*)malloc(sizeof(double)* (NF));
@@ -2905,11 +2475,11 @@ void FisherSub(struct Data *dat, int ll, int *pmap, double *params, double **Fis
     EampP = (double*)malloc(sizeof(double)* (NF));
     EampM = (double*)malloc(sizeof(double)* (NF));
     
-    DphaseA = double_matrix(NP, NF);
-    DampA = double_matrix(NP, NF);
+    DphaseA = double_matrix(NParams, NF);
+    DampA = double_matrix(NParams, NF);
     
-    DphaseE = double_matrix(NP, NF);
-    DampE = double_matrix(NP, NF);
+    DphaseE = double_matrix(NParams, NF);
+    DampE = double_matrix(NParams, NF);
     
     
     AAmp = (double*)malloc(sizeof(double)* (NF));
@@ -2942,7 +2512,7 @@ void FisherSub(struct Data *dat, int ll, int *pmap, double *params, double **Fis
         if(pmap[i] > -1)
         {
         
-        for (j=0; j< NP; j++)
+        for (j=0; j< NParams; j++)
         {
             paramsP[j] = params[j];
             paramsM[j] = params[j];
@@ -3036,12 +2606,12 @@ void FisherSub(struct Data *dat, int ll, int *pmap, double *params, double **Fis
         }
     }
     
-    for (i=7; i< NP; i++)
+    for (i=7; i< NParams; i++)
     {
         if(pmap[i] > -1)
         {
             
-        for (j=0; j< NP; j++)
+        for (j=0; j< NParams; j++)
         {
             paramsP[j] = params[j];
             paramsM[j] = params[j];
@@ -3075,12 +2645,12 @@ void FisherSub(struct Data *dat, int ll, int *pmap, double *params, double **Fis
     
     
     
-    for (i=0; i< NP; i++)
+    for (i=0; i< NParams; i++)
     {
         if(pmap[i] > -1)
         {
             
-        for (j=i; j< NP; j++)
+        for (j=i; j< NParams; j++)
         {
             if(pmap[j] > -1)
             {
@@ -3104,12 +2674,12 @@ void FisherSub(struct Data *dat, int ll, int *pmap, double *params, double **Fis
         
     }
     
-    for (i=0; i< NP; i++)
+    for (i=0; i< NParams; i++)
     {
         if(pmap[i] > -1)
         {
             
-        for (j=i+1; j< NP; j++)
+        for (j=i+1; j< NParams; j++)
         {
             if(pmap[j] > -1)
             {
@@ -3120,10 +2690,10 @@ void FisherSub(struct Data *dat, int ll, int *pmap, double *params, double **Fis
         }
     }
     
-    free_double_matrix(DphaseA,NP);
-    free_double_matrix(DampA,NP);
-    free_double_matrix(DphaseE,NP);
-    free_double_matrix(DampE,NP);
+    free_double_matrix(DphaseA,NParams);
+    free_double_matrix(DampA,NParams);
+    free_double_matrix(DphaseE,NParams);
+    free_double_matrix(DampE,NParams);
     
     free(epsilon);
     free(SADS);
@@ -3164,134 +2734,13 @@ void FisherSub(struct Data *dat, int ll, int *pmap, double *params, double **Fis
     
 }
 
-void FisherDirect(struct Data *dat, int ll, double *params, double **Fisher)
-{
-    double af, fr, df, DT, fac, deltaF, f, fmin, x, t;
-    double m1, m2, chi1, chi2, Mtot, Mc, eta;
-    double Amp, Phase, tf, fguess;
-    double m1_SI, m2_SI, distance, tc, phic;
-    double *paramsP, *paramsM;
-    int i, j, k, ii, NF, NW, lx, N;
-    double A, P;
-    double px, fnew, kxm;
-    double *epsilon;
-    double **AH, **AP, **AM;
-    double **EH, **EP, **EM;
-    
-    int kmin, kmax, flag;
-    
-    N = dat->N;
-
-    
-    epsilon = (double*)malloc(sizeof(double)* (NP));
-    paramsP = (double*)malloc(sizeof(double)* (NP));
-    paramsM = (double*)malloc(sizeof(double)* (NP));
-    
-    AH = double_matrix(NP,N);
-    AP = double_matrix(NP,N);
-    AM = double_matrix(NP,N);
-    EH = double_matrix(NP,N);
-    EP = double_matrix(NP,N);
-    EM = double_matrix(NP,N);
-    
-    // [0] ln(Mass1)  [1] ln(Mass2)  [2] Spin1 [3] Spin2 [4] phic [5] tc [6] ln(distance)
-    // [7] EclipticCoLatitude, [8] EclipticLongitude  [9] polarization, [10] inclination
-    
-    // will take log derivatives for m1, m2, DL
-    
-    epsilon[0] = 1.0e-6;
-    epsilon[1] = 1.0e-6;
-    epsilon[2] = 1.0e-4;
-    epsilon[3] = 1.0e-4;
-    epsilon[4] = 1.0e-4;
-    epsilon[5] = 1.0e-2;
-    epsilon[6] = 1.0e-4;
-    epsilon[7] = 1.0e-4;
-    epsilon[8] = 1.0e-4;
-    epsilon[9] = 1.0e-4;
-    epsilon[10] = 1.0e-4;
-    
-    for (i=0; i< NP; i++)
-    {
-        
-        for (j=0; j< NP; j++)
-        {
-            paramsP[j] = params[j];
-            paramsM[j] = params[j];
-        }
-        
-        
-        if(ll==0)
-        {
-            if(i==0 || i==1 || i==6) // log derivatives
-            {
-            x = exp(epsilon[i]);
-            paramsP[i] *= x;
-            paramsM[i] /= x;
-            }
-            else
-            {
-                paramsP[i] += epsilon[i];
-                paramsM[i] -= epsilon[i];
-            }
-            
-        }
-        else
-        {
-            paramsP[i] += epsilon[i];
-            paramsM[i] -= epsilon[i];
-        }
-
-        ResponseFreq(dat, ll, paramsP, AP[i], EP[i]);
-        ResponseFreq(dat, ll, paramsM, AM[i], EM[i]);
-
-        for (j=0; j< N; j++) AH[i][j] = (AP[i][j]-AM[i][j])/(2.0*epsilon[i]);
-        for (j=0; j< N; j++) EH[i][j] = (EP[i][j]-EM[i][j])/(2.0*epsilon[i]);
-        
-    }
-
-       free_double_matrix(AP,NP);
-       free_double_matrix(AM,NP);
-       free_double_matrix(EP,NP);
-       free_double_matrix(EM,NP);
-    
-       free(epsilon);
-       free(paramsP);
-       free(paramsM);
-
-   
-    for (i=0; i< NP; i++)
-    {
-        for (j=i; j< NP; j++)
-        {
-  
-            Fisher[i][j] =  fourier_nwip(AH[i], AH[j], dat->SN[0], N) + fourier_nwip(EH[i], EH[j], dat->SN[1], N);
-
-        }
-        
-    }
-    
-    for (i=0; i< NP; i++)
-    {
-        for (j=i+1; j< NP; j++)
-        {
-            Fisher[j][i] =  Fisher[i][j];
-        }
-    }
-    
-    free_double_matrix(AH,NP);
-    free_double_matrix(EH,NP);
-    
-    
-}
-
-double chisq_het(struct Data *dat, struct Het *het, int ll, double *params, double **ampR, double **phaseR)
+double chisq_het(struct MBH_Data *dat, struct Het *het, int ll, double *params, double **ampR, double **phaseR)
 {
     double **amp, **phase;
     double *uu, *vv, **cc;
     int Nch, M, J, NR;
     double csq;
-    int i, id, ii, jj, kk;
+    int id, ii, jj, kk;
     
     Nch = het->Nch;
     M = het->M;
@@ -3360,10 +2809,9 @@ double chisq_het(struct Data *dat, struct Het *het, int ll, double *params, doub
     
 }
 
-double chisq(struct Data *dat, int ll, double *params, double *AR, double *ER)
+double chisq(struct MBH_Data *dat, int ll, double *params, double *AR, double *ER)
 {
     double *AS, *ES;
-    double HH, HD;
     double csq;
     int i;
     
@@ -3378,8 +2826,7 @@ double chisq(struct Data *dat, int ll, double *params, double *AR, double *ER)
            ES[i] -= ER[i];
        }
     
-    csq = (fourier_nwip(AS, AS, dat->SN[0], dat->N)+fourier_nwip(ES, ES, dat->SN[1], dat->N));
-    
+    csq = (fourier_nwip2(AS, AS, dat->SN[0], 1, dat->N/2, dat->N)+fourier_nwip2(ES, ES, dat->SN[1], 1, dat->N/2, dat->N));    
     
     free(AS);
     free(ES);
@@ -3388,13 +2835,13 @@ double chisq(struct Data *dat, int ll, double *params, double *AR, double *ER)
     
 }
 
-void efix(struct Data *dat, struct Het *het, int hr, int ll, double *params, double *min, double *max, double *eval, double **evec, double zs)
+void efix(struct MBH_Data *dat, struct Het *het, int hr, int ll, double *params, double *min, double *max, double *eval, double **evec, double zs)
 {
     int i, j, k, flag;
     double alpha0, x, z, z0, alpha, alphanew;
     double dz, alphax;
     double leta, eta;
-    double zmx, zmn;
+    double zmx, zmn, sgn;
     double dzmin, alpham, zm;
     double *px;
     double **ampR, **phaseR;
@@ -3419,9 +2866,9 @@ void efix(struct Data *dat, struct Het *het, int hr, int ll, double *params, dou
     zmx = zs*2.0;
     zmn = zs/2.0;
     
-    px = double_vector(NP);
+    px = double_vector(NParams);
 
-   for (i = 0; i < NP; ++i)
+   for (i = 0; i < NParams; ++i)
      {
          
         dzmin = 1.0e20;
@@ -3429,21 +2876,22 @@ void efix(struct Data *dat, struct Het *het, int hr, int ll, double *params, dou
          
       alpha0 = 1.0;
          
+      for (j = 0; j < NParams; ++j) px[j] = params[j] + alpha0*eval[i]*evec[i][j];
+         
+        sgn = 1.0;
+        if(ll == 2)
+        {
+        leta = (5.0/3.0)*(px[0]-px[1]);
+        eta = exp(leta);
+        if(eta > etamax) sgn = -1.0;
+        }
+         
         
       k = 0;
       do
       {
-      for (j = 0; j < NP; ++j) px[j] = params[j] + alpha0*eval[i]*evec[i][j];
-      
-      if(ll == 2)
-          {
-        leta = (5.0/3.0)*(px[0]-px[1]);
-        eta = exp(leta);
-         if(eta > 0.25)
-         {
-         for (j = 0; j < NP; ++j) px[j] = params[j] - alpha0*eval[i]*evec[i][j];
-         }
-          }
+      for (j = 0; j < NParams; ++j) px[j] = params[j] + sgn*alpha0*eval[i]*evec[i][j];
+          
           
           // re-map angular parameters to their proper range
           
@@ -3464,17 +2912,15 @@ void efix(struct Data *dat, struct Het *het, int hr, int ll, double *params, dou
           while(px[9] > PI)   px[9] -= PI;
           while(px[9] < 0.0)  px[9] += PI;
           
-         // for (j = 0; j < NP; ++j) printf("%d %e %e %e %e\n", j, px[j], params[j], min[j], max[j]);
           
-          
-          for (j = 0; j < NP; ++j) if(px[j] > max[j]) px[j] = max[j];
-          for (j = 0; j < NP; ++j) if(px[j] < min[j]) px[j] = min[j];
+          for (j = 0; j < NParams; ++j) if(px[j] > max[j]) px[j] = max[j];
+          for (j = 0; j < NParams; ++j) if(px[j] < min[j]) px[j] = min[j];
       
           if(ll == 2)
           {
           leta = (5.0/3.0)*(px[0]-px[1]);
           eta = exp(leta);
-          if(eta > 0.25) px[0] = px[1] + 3.0/5.0*log(0.2499);
+          if(eta > etamax) px[0] = px[1] + 3.0/5.0*log(etamax);
           if(eta < etamin) px[0] = px[1] + 3.0/5.0*log(etamin);
           }
           
@@ -3487,7 +2933,7 @@ void efix(struct Data *dat, struct Het *het, int hr, int ll, double *params, dou
           z0 = chisq(dat, ll, px, AR, ER);
           }
           
-         //printf("B %f %f\n", alpha0, z0);
+        // printf("B %f %f\n", alpha0, z0);
           
           dz = fabs(z0-zs);
           if(dz < dzmin)
@@ -3502,25 +2948,27 @@ void efix(struct Data *dat, struct Het *het, int hr, int ll, double *params, dou
           
           k++;
           
-      } while ( (z0 > zmx || z0 < zmn) && k < 15 && fabs(alpha0 < 1.0e4));
+      } while ( (z0 > zmx || z0 < zmn) && k < 15 && fabs(alpha0) < 1.0e4);
       
       
       alpha = alpha0*1.1;
+         
+        for (j = 0; j < NParams; ++j) px[j] = params[j] + alpha*eval[i]*evec[i][j];
+          
+        sgn = 1.0;
+        if(ll == 2)
+         {
+         leta = (5.0/3.0)*(px[0]-px[1]);
+         eta = exp(leta);
+         if(eta > etamax) sgn = -1.0;
+         }
           
         k = 0;
+         
         do
         {
-        for (j = 0; j < NP; ++j) px[j] = params[j] + alpha*eval[i]*evec[i][j];
-         
-        if(ll == 2)
-        {
-        leta = (5.0/3.0)*(px[0]-px[1]);
-        eta = exp(leta);
-        if(eta > 0.25)
-        {
-          for (j = 0; j < NP; ++j) px[j] = params[j] - alpha*eval[i]*evec[i][j];
-        }
-        }
+            
+        for (j = 0; j < NParams; ++j) px[j] = params[j] + sgn*alpha*eval[i]*evec[i][j];
             
         // re-map angular parameters to their proper range
             x = px[4]/PI;
@@ -3540,18 +2988,17 @@ void efix(struct Data *dat, struct Het *het, int hr, int ll, double *params, dou
         while(px[9] > PI)   px[9] -= PI;
         while(px[9] < 0.0)  px[9] += PI;
             
-        for (j = 0; j < NP; ++j) if(px[j] > max[j]) px[j] = max[j];
-        for (j = 0; j < NP; ++j) if(px[j] < min[j]) px[j] = min[j];
+        for (j = 0; j < NParams; ++j) if(px[j] > max[j]) px[j] = max[j];
+        for (j = 0; j < NParams; ++j) if(px[j] < min[j]) px[j] = min[j];
             
             if(ll == 2)
             {
             leta = (5.0/3.0)*(px[0]-px[1]);
             eta = exp(leta);
-            if(eta > 0.25) px[0] = px[1] + 3.0/5.0*log(0.2499);
+            if(eta > etamax) px[0] = px[1] + 3.0/5.0*log(etamax);
             if(eta < etamin) px[0] = px[1] + 3.0/5.0*log(etamin);
             }
-            
-           
+
             
             if(hr == 1)  // using heterodyne
             {
@@ -3562,7 +3009,7 @@ void efix(struct Data *dat, struct Het *het, int hr, int ll, double *params, dou
               z = chisq(dat, ll, px, AR, ER);
             }
             
-            //printf("R %f %f\n", alpha, z);
+            
             
             if(alpha > alpha0)
             {
@@ -3572,6 +3019,8 @@ void efix(struct Data *dat, struct Het *het, int hr, int ll, double *params, dou
             {
              alphanew = alpha +(zs-z)/(z0-z)*(alpha0-alpha);
             }
+            
+           // printf("R %f %f\n", alpha,  z);
             
             dz = fabs(z-zs);
             if(dz < dzmin)
@@ -3589,7 +3038,7 @@ void efix(struct Data *dat, struct Het *het, int hr, int ll, double *params, dou
              
         } while (fabs(z-zs) > 0.2 && k < 10 && fabs(alpha) < 1.0e4);
          
-          // printf("F %f %f\n", alpham, zm);
+         // printf("F %f %f\n", alpham, zm);
          
          // printf("\n");
          
@@ -3619,10 +3068,10 @@ void efix(struct Data *dat, struct Het *het, int hr, int ll, double *params, dou
 void instrument_noise(double f, double *SAE)
 {
     //Power spectral density of the detector noise and transfer frequency
-    double Sn, rolla, rollw, confusion_noise;
-    double Sloc, fonfs;
-    double f1, f2;
-    double A1, A2, slope, LC;
+    double rolla, rollw;
+    double fonfs;
+
+    double LC;
     double Sps = 2.25e-22;
     double Sacc = 9.0e-30;
     
@@ -3645,36 +3094,7 @@ void instrument_noise(double f, double *SAE)
     
 }
 
-double Likelihood_check(struct Data *dat, struct Het *het, int ll, double *params)
-{
-    double *AS, *ES;
-    double HH, HD;
-    double logL;
-    int imax, imin;
-    
-    imin = het->MN;
-    imax = het->MM;
-    
-    AS = (double*)malloc(sizeof(double)* (dat->N));
-    ES = (double*)malloc(sizeof(double)* (dat->N));
-    
-    ResponseFast(dat, ll, params, AS, ES);
-    
-    HH = (fourier_nwip2(AS, AS, dat->SN[0], imin, imax, dat->N)+fourier_nwip2(ES, ES, dat->SN[1], imin, imax, dat->N));
-    HD = (fourier_nwip2(AS, dat->data[0], dat->SN[0], imin, imax, dat->N)+fourier_nwip2(ES, dat->data[1], dat->SN[1], imin, imax, dat->N));
-    
-    logL = HD-0.5*HH;
-    
-   //printf("%e %e %e\n", logL, HH, HD);
-    
-    free(AS);
-    free(ES);
-    
-    return(logL);
-    
-}
-
-double SNRstart(struct Data *dat, int ll, double *params)
+double SNRstart(struct MBH_Data *dat, int ll, double *params)
 {
     double *AS, *ES;
     double HH;
@@ -3682,7 +3102,7 @@ double SNRstart(struct Data *dat, int ll, double *params)
     double SNRmin = 0.01;
     double HHmin;
     int i, j, imax;
-    
+
     // This subroutine finds the frequency where we start to get some SNRb accumulation
     
     HHmin = SNRmin*SNRmin;
@@ -3715,105 +3135,44 @@ double SNRstart(struct Data *dat, int ll, double *params)
     
 }
 
-double Likelihood(struct Data *dat, int ll, double *params)
-{
-    double *AS, *ES;
-    double HH, HD;
-    double logL;
-    
-    AS = (double*)malloc(sizeof(double)* (dat->N));
-    ES = (double*)malloc(sizeof(double)* (dat->N));
-    
-    ResponseFast(dat, ll, params, AS, ES);
-    
-    HH = (fourier_nwip(AS, AS, dat->SN[0], dat->N)+fourier_nwip(ES, ES, dat->SN[1], dat->N));
-    HD = (fourier_nwip(AS, dat->data[0], dat->SN[0], dat->N)+fourier_nwip(ES, dat->data[1], dat->SN[1], dat->N));
-    
-    logL = HD-0.5*HH;
-    
-   //printf("%e %e %e\n", logL, HH, HD);
-    
-    free(AS);
-    free(ES);
-    
-    return(logL);
-    
-}
-
-double Likelihood_Slow(struct Data *dat, int ll, double *params)
-{
-    int i;
-    double *AS, *ES;
-    double HH, HD;
-    double AA, EE;
-    double logL;
-    FILE *out;
-    
-    AS = (double*)malloc(sizeof(double)* (dat->N));
-    ES = (double*)malloc(sizeof(double)* (dat->N));
-    
-    ResponseFreq(dat, ll, params, AS, ES);
-    
-    HH = (fourier_nwip(AS, AS, dat->SN[0], dat->N)+fourier_nwip(ES, ES, dat->SN[1], dat->N));
-    HD = (fourier_nwip(AS, dat->data[0], dat->SN[0], dat->N)+fourier_nwip(ES, dat->data[1], dat->SN[1], dat->N));
-    
-    logL = HD-0.5*HH;
-    
-    free(AS);
-    free(ES);
-    
-    return(logL);
-    
-}
-
-void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *ES)
+void ResponseFreq(struct MBH_Data *dat, int ll, double *params, double *AS, double *ES)
 {
     
     /*   Indicies   */
-    int i,j, k, n, m, a, M, nn, nmin, nmax;
+    int i, n, m, nn;
     
     /*   GW Source data   */
-    double Mc, theta, phi, psi, D, iota, A, Aplus, Across, f0, fdot, phio;
-    double costh, sinth, cosph, sinph, cosi, cosps, sinps;
+    double Mc, Aplus, Across;
+    double cosi;
     
     /*   Time and distance variables   */
     double xi, t;
     
     /*   Miscellaneous  */
-    double xm, fstep, power, om, mx;
-    
     double Amp, Phase, fonfs, f, x;
+        
+    double HC, HS, Tobs;
     
-    double Aprime, Pprime, fi, fend;
-    
-    double HC, HS, hp, hc, Tobs;
-    
-    double m1, m2, chi1, chi2, phic, tc, distance, Mtot, eta, dm, fr, af;
+    double m1, m2, chi1, chi2, phic, tc, distance, Mtot, eta, fr;
     
     double *ta, *xia, *FF;
     
-    double Fp, Fc, kdotx, delt, fmin, fmax;
-    
-    double XR, XI, YR, YI, ZR, ZI;
-    
-    double fstart, fstop, Tcut, fref;
+    double kdotx, fmin, fmax;
+        
+    double fstart, fstop;
     
     double sqrtTobs;
     
     int nfmin, nfmax, nf;
     
-    int NA, N;
+    int N;
     
-    clock_t start, end;
-    double cpu_time_used;
     
     double m1_SI, m2_SI, deltaF;
     
     double *FpAR, *FpAI, *FcAR, *FcAI;
     double *FpER, *FpEI, *FcER, *FcEI;
-    
-    FILE *out;
-    
+        
     N = dat->N;
     Tobs = dat->Tobs;
     sqrtTobs = dat->sqrtTobs;
@@ -3831,11 +3190,18 @@ void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *
    // printf("%e %e %e\n", fstart, fstop, fr);
 
     
-    
+//    distance = params[6]*1.0e9*PC_SI; // distance
+//    get_component_masses(params, ll, &m1, &m2);
+//    m1*=Tsun;
+//    m2*=Tsun;
+//    Mtot = (m1+m2);
+//    eta = m1*m2/((m1+m2)*(m1+m2));
+//    Mc = pow(m1*m2,3.0/5.0)/pow(m1+m2,1.0/5.0);
+    double dm;
     if(ll == 0)  // linear in m1, m2
     {
-    m1 = params[0]*TSUN;    // Mass1
-    m2 = params[1]*TSUN;    // Mass2
+    m1 = params[0]*Tsun;    // Mass1
+    m2 = params[1]*Tsun;    // Mass2
     distance = params[6]*1.0e9*PC_SI; // distance
     Mtot = (m1+m2);
     eta = m1*m2/((m1+m2)*(m1+m2));
@@ -3843,8 +3209,8 @@ void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *
     }
     else if(ll == 1)  // log in m1, m2
     {
-     m1 = exp(params[0])*TSUN;    // Mass1
-     m2 = exp(params[1])*TSUN;    // Mass2
+     m1 = exp(params[0])*Tsun;    // Mass1
+     m2 = exp(params[1])*Tsun;    // Mass2
      distance = exp(params[6])*1.0e9*PC_SI; // distance
      Mtot = (m1+m2);
      eta = m1*m2/((m1+m2)*(m1+m2));
@@ -3853,8 +3219,8 @@ void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *
     else // log in Mc, Mt
     {
     distance = exp(params[6])*1.0e9*PC_SI; // distance
-    Mc = exp(params[0])*TSUN;
-    Mtot = exp(params[1])*TSUN;
+    Mc = exp(params[0])*Tsun;
+    Mtot = exp(params[1])*Tsun;
     eta = pow((Mc/Mtot), (5.0/3.0));
      if(eta > 0.25)
      {
@@ -3868,8 +3234,8 @@ void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *
     m2 = Mtot*(1.0-dm)/2.0;
     }
     
-    m1_SI = m1*MSUN_SI/TSUN;
-    m2_SI = m2*MSUN_SI/TSUN;
+    m1_SI = m1*MSUN_SI/Tsun;
+    m2_SI = m2*MSUN_SI/Tsun;
 
     chi1 = params[2];  // Spin1
     chi2 = params[3];  // Spin2
@@ -3883,7 +3249,7 @@ void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *
     AmpPhaseFDWaveform *ap = NULL;
     double fRef_in;
     double *AF, *TF;
-    int ret, flag1, flag2;
+    int ret;
     
     AF = (double*)malloc(sizeof(double)* (N/2));
     TF = (double*)malloc(sizeof(double)* (N/2));
@@ -4029,28 +3395,25 @@ void ResponseFreq(struct Data *dat, int ll, double *params, double *AS, double *
 }
 
 
-void ResponseFast(struct Data *dat, int ll, double *params, double *AS, double *ES)
+void ResponseFast(struct MBH_Data *dat, int ll, double *params, double *AS, double *ES)
 {
     double *AAmp, *EAmp, *APhase, *EPhase;
     double *APC, *APS, *EPC, *EPS;
-    double af, fr, df, DT, fac, deltaF, f, fmax, fmin, x;
-    double m1, m2, chi1, chi2, Mtot, Mc, eta;
-    double Amp, Phase, tf, fguess, kxm;
-    double m1_SI, m2_SI, distance, tc, phic;
+    double f;
+    double kxm;
+    double tc, phic;
     double cp, sp, cpx, spx;
     int i, NF;
-    double A, P;
-    double px, fnew;
+    double A;
+    double px;
     
     int NFmax = 100000;
     
     double *AF, *PF, *FF, *TF;
-    
-    FILE *out;
-    
+        
     FF = (double*)malloc(sizeof(double)* (NFmax));
     
-    SetUp(dat, ll, params, NFmax, &NF, FF);
+    SetUp(dat, ll, params, &NF, FF);
     
     AF = (double*)malloc(sizeof(double)* (NF));
     PF = (double*)malloc(sizeof(double)* (NF));
@@ -4207,8 +3570,7 @@ void timearray(double *params, RealVector *freq, long N, double *TF, AmpPhaseFDW
     
     int flag;
     int i, j;
-    double v;
-    double tc,  deltaF, fmax;
+    double tc;
     
     tc = params[5];    // merger time
 
@@ -4245,12 +3607,9 @@ void timearray(double *params, RealVector *freq, long N, double *TF, AmpPhaseFDW
 void StartStop(int ll, double *params, double Tstart, double Tend, double dt, double *fstart, double *fstop, double *frg)
 {
     
-    double m1, m2, m1_SI, m2_SI, chi1, chi2, tc, dm;
-    double Mtot, eta, Mc, af, fr;
-    double Amp, Phase, distance;
+    double fr;
     double fmin, fmax;
-    double fnew, tf, fny, Tseg;
-    int i;
+    double Tseg;
     
     Tseg = Tend-Tstart;
     
@@ -4284,8 +3643,8 @@ void Intrinsic(int ll, double *params, double Tobs, int NF, double *FF, double *
     RealVector *freq;
     
     double m1, m2, chi1, chi2, Mtot, Mc;
-    double m1_SI, m2_SI, distance, tc, phic;
-    double eta, dm, fx;
+    double m1_SI, m2_SI, distance, tc;
+    double eta, fx;
     
     double af, fr, dtdf, sqrtTobs;
     
@@ -4296,10 +3655,18 @@ void Intrinsic(int ll, double *params, double Tobs, int NF, double *FF, double *
 
     double fRef_in;
     
+//    distance = params[6]*1.0e9*PC_SI; // distance
+//    get_component_masses(params, ll, &m1, &m2);
+//    m1*=Tsun;
+//    m2*=Tsun;
+//    Mtot = (m1+m2);
+//    eta = m1*m2/((m1+m2)*(m1+m2));
+//    Mc = pow(m1*m2,3.0/5.0)/pow(m1+m2,1.0/5.0);
+    double dm;
     if(ll == 0)  // linear in m1, m2
     {
-    m1 = params[0]*TSUN;    // Mass1
-    m2 = params[1]*TSUN;    // Mass2
+    m1 = params[0]*Tsun;    // Mass1
+    m2 = params[1]*Tsun;    // Mass2
     distance = params[6]*1.0e9*PC_SI; // distance
     Mtot = (m1+m2);
     eta = m1*m2/((m1+m2)*(m1+m2));
@@ -4307,8 +3674,8 @@ void Intrinsic(int ll, double *params, double Tobs, int NF, double *FF, double *
     }
     else if(ll == 1)  // log in m1, m2
     {
-     m1 = exp(params[0])*TSUN;    // Mass1
-     m2 = exp(params[1])*TSUN;    // Mass2
+     m1 = exp(params[0])*Tsun;    // Mass1
+     m2 = exp(params[1])*Tsun;    // Mass2
      distance = exp(params[6])*1.0e9*PC_SI; // distance
      Mtot = (m1+m2);
      eta = m1*m2/((m1+m2)*(m1+m2));
@@ -4316,8 +3683,8 @@ void Intrinsic(int ll, double *params, double Tobs, int NF, double *FF, double *
     }
     else // log in Mc, Mt
     {
-    Mc = exp(params[0])*TSUN;
-    Mtot = exp(params[1])*TSUN;
+    Mc = exp(params[0])*Tsun;
+    Mtot = exp(params[1])*Tsun;
     distance = exp(params[6])*1.0e9*PC_SI; // distance
     eta = pow((Mc/Mtot), (5.0/3.0));
      if(eta > 0.25)
@@ -4332,8 +3699,8 @@ void Intrinsic(int ll, double *params, double Tobs, int NF, double *FF, double *
     m2 = Mtot*(1.0-dm)/2.0;
     }
     
-    m1_SI = m1*MSUN_SI/TSUN;
-    m2_SI = m2*MSUN_SI/TSUN;
+    m1_SI = m1*MSUN_SI/Tsun;
+    m2_SI = m2*MSUN_SI/Tsun;
     
     chi1 = params[2];  // Spin1
     chi2 = params[3];  // Spin2
@@ -4470,22 +3837,22 @@ void spacecraft(double t, double *x, double *y, double *z)
 
   sb = sin(beta1);
   cb = cos(beta1);
-  x[1] = AU*ca + AU*ec*(sa*ca*sb - (1. + sa*sa)*cb);
-  y[1] = AU*sa + AU*ec*(sa*ca*cb - (1. + ca*ca)*sb);
-  z[1] = -sq3*AU*ec*(ca*cb + sa*sb);
+  x[1] = au*ca + au*ec*(sa*ca*sb - (1. + sa*sa)*cb);
+  y[1] = au*sa + au*ec*(sa*ca*cb - (1. + ca*ca)*sb);
+  z[1] = -sq3*au*ec*(ca*cb + sa*sb);
 
  
   sb = sin(beta2);
   cb = cos(beta2);
-  x[2] = AU*ca + AU*ec*(sa*ca*sb - (1. + sa*sa)*cb);
-  y[2] = AU*sa + AU*ec*(sa*ca*cb - (1. + ca*ca)*sb);
-  z[2] = -sq3*AU*ec*(ca*cb + sa*sb);
+  x[2] = au*ca + au*ec*(sa*ca*sb - (1. + sa*sa)*cb);
+  y[2] = au*sa + au*ec*(sa*ca*cb - (1. + ca*ca)*sb);
+  z[2] = -sq3*au*ec*(ca*cb + sa*sb);
 
   sb = sin(beta3);
   cb = cos(beta3);
-  x[3] = AU*ca + AU*ec*(sa*ca*sb - (1. + sa*sa)*cb);
-  y[3] = AU*sa + AU*ec*(sa*ca*cb - (1. + ca*ca)*sb);
-  z[3] = -sq3*AU*ec*(ca*cb + sa*sb);
+  x[3] = au*ca + au*ec*(sa*ca*sb - (1. + sa*sa)*cb);
+  y[3] = au*sa + au*ec*(sa*ca*cb - (1. + ca*ca)*sb);
+  z[3] = -sq3*au*ec*(ca*cb + sa*sb);
   
 }
 
@@ -4575,10 +3942,7 @@ void lisaskyloc(double t, double *params, double *thetaL, double *phiL)
 // merger time at guiding center of detector
 double Tmerger(double *params, double t)
 {
-    
-    /*   Indicies   */
-    int i,j, k, n, m, a, M;
-    
+        
     /*   Gravitational Wave basis vectors   */
     double *kv;
     
@@ -4589,14 +3953,14 @@ double Tmerger(double *params, double t)
     double kdotx;
     
     /*   GW Source data   */
-    double Mc, theta, phi, psi, D, iota, A, Aplus, Across, f0, fdot, phio;
-    double costh, sinth, cosph, sinph, cosi, cosps, sinps;
+    double phi;
+    double costh, sinth, cosph, sinph;
     
     /*   Time and distance variables   */
     double xa, ya, za;
     
     /*   Miscellaneous  */
-    double xm, td;
+    double td;
     
     /*   Allocating Arrays   */
     
@@ -4632,7 +3996,6 @@ double Tmerger(double *params, double t)
 double f_at_t(double m1, double m2, double chi1, double chi2, double tc, double dt, double t)
 {
     // 3PN f(t)
-    int i;
     double f, fr, fny, af, M, eta, chi, theta;
     double gamma_E=0.5772156649; //Euler's Constant-- shows up in 3PN term
     double PN1, PN15, PN2, PN25, PN3, PN35;
@@ -4690,17 +4053,25 @@ double f_at_t(double m1, double m2, double chi1, double chi2, double tc, double 
 double FofT(int ll, double Tobs, double *params, double *frg, double dt, double tref)
 {
     
-    double m1, m2, m1_SI, m2_SI, chi1, chi2, tc, dm;
+    double m1, m2, m1_SI, m2_SI, chi1, chi2, tc;
     double Mtot, eta, Mc, af, fr;
     double Amp, Phase, distance;
     double fref;
     double fnew, tf;
     int i;
     
+//    distance = params[6]*1.0e9*PC_SI; // distance
+//    get_component_masses(params, ll, &m1, &m2);
+//    m1*=Tsun;
+//    m2*=Tsun;
+//    Mtot = (m1+m2);
+//    eta = m1*m2/((m1+m2)*(m1+m2));
+//    Mc = pow(m1*m2,3.0/5.0)/pow(m1+m2,1.0/5.0);
+    double dm;
     if(ll == 0)  // linear in m1, m2
     {
-    m1 = params[0]*TSUN;    // Mass1
-    m2 = params[1]*TSUN;    // Mass2
+    m1 = params[0]*Tsun;    // Mass1
+    m2 = params[1]*Tsun;    // Mass2
     distance = params[6]*1.0e9*PC_SI; // distance
     Mtot = (m1+m2);
     eta = m1*m2/((m1+m2)*(m1+m2));
@@ -4708,8 +4079,8 @@ double FofT(int ll, double Tobs, double *params, double *frg, double dt, double 
     }
     else if(ll == 1)  // log in m1, m2
     {
-     m1 = exp(params[0])*TSUN;    // Mass1
-     m2 = exp(params[1])*TSUN;    // Mass2
+     m1 = exp(params[0])*Tsun;    // Mass1
+     m2 = exp(params[1])*Tsun;    // Mass2
      distance = exp(params[6])*1.0e9*PC_SI; // distance
      Mtot = (m1+m2);
      eta = m1*m2/((m1+m2)*(m1+m2));
@@ -4718,8 +4089,8 @@ double FofT(int ll, double Tobs, double *params, double *frg, double dt, double 
     else // log in Mc, Mt
     {
     distance = exp(params[6])*1.0e9*PC_SI; // distance
-    Mc = exp(params[0])*TSUN;
-    Mtot = exp(params[1])*TSUN;
+    Mc = exp(params[0])*Tsun;
+    Mtot = exp(params[1])*Tsun;
     eta = pow((Mc/Mtot), (5.0/3.0));
      if(eta > 0.25)
      {
@@ -4733,8 +4104,8 @@ double FofT(int ll, double Tobs, double *params, double *frg, double dt, double 
     m2 = Mtot*(1.0-dm)/2.0;
     }
     
-    m1_SI = m1*MSUN_SI/TSUN;
-    m2_SI = m2*MSUN_SI/TSUN;
+    m1_SI = m1*MSUN_SI/Tsun;
+    m2_SI = m2*MSUN_SI/Tsun;
     
     chi1 = params[2];
     chi2 = params[3];
@@ -4889,7 +4260,7 @@ void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, doubl
 {
     
     /*   Indicies    */
-    int i,j, k, n, m, a, M;
+    int i,j, k, n;
     
     /*   Gravitational Wave basis vectors   */
     double *u,*v,*kv;
@@ -4901,7 +4272,6 @@ void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, doubl
     double *x, *y, *z;
     double *r12, *r13, *r21, *r23, *r31, *r32;
     double *r10, *r20, *r30;
-    double *vx, *vy, *vz;
     
     double q1, q2, q3, q4;
     
@@ -4912,17 +4282,12 @@ void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, doubl
     double **dplus, **dcross;
     
     /*   GW Source data   */
-    double Mc, theta, phi, psi, D, iota, A, Aplus, Across, f0, fdot, phio;
-    double costh, sinth, cosph, sinph, cosi, cosps, sinps;
+    double phi, psi;
+    double costh, sinth, cosph, sinph, cosps, sinps;
     
     /*   Time and distance variables   */
     double t, xa, ya, za;
-    
-    /*   Miscellaneous  */
-    double xm, fstep, power, om, mx;
-    
-    double delt;
-    
+        
     double fpx, fcx, fpy, fcy, fpz, fcz;
     
     double **TR, **TI, **kdr;
@@ -5081,12 +4446,21 @@ void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, doubl
         fpz = -0.5*( (dplus[3][1]*cosps+dcross[3][1]*sinps)*TR[3][1] - (dplus[3][2]*cosps+dcross[3][2]*sinps)*TR[3][2] );
         fcz = -0.5*( (-dplus[3][1]*sinps+dcross[3][1]*cosps)*TR[3][1] - (-dplus[3][2]*sinps + dcross[3][2]*cosps)*TR[3][2] );
 
+        /* Original AET definition
         FpAR[n] = (2.0*fpx-fpy-fpz)/3.0;
         FcAR[n] = (2.0*fcx-fcy-fcz)/3.0;
         
         FpER[n] = (fpz-fpy)/sq3;
-        FcER[n] = (fcz-fcy)/sq3;
-                   
+        FcER[n] = (fcz-fcy)/sq3;*/
+        
+        
+        /* LDC's AET definition */
+        FpAR[n] = (fpz-fpx)*0.707106781186547;
+        FcAR[n] = (fcz-fcx)*0.707106781186547;
+        
+        FpER[n] = (fpx-2*fpy+fpz)*0.408248290463863;
+        FcER[n] = (fcx-2*fcy+fcz)*0.408248290463863;
+        
         fpx = -0.5*( (dplus[1][2]*cosps+dcross[1][2]*sinps)*TI[1][2] - (dplus[1][3]*cosps+dcross[1][3]*sinps)*TI[1][3] );
         fcx = -0.5*( (-dplus[1][2]*sinps+dcross[1][2]*cosps)*TI[1][2] - (-dplus[1][3]*sinps + dcross[1][3]*cosps)*TI[1][3] );
                                          
@@ -5095,13 +4469,21 @@ void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, doubl
                                                                
         fpz = -0.5*( (dplus[3][1]*cosps+dcross[3][1]*sinps)*TI[3][1] - (dplus[3][2]*cosps+dcross[3][2]*sinps)*TI[3][2] );
         fcz = -0.5*( (-dplus[3][1]*sinps+dcross[3][1]*cosps)*TI[3][1] - (-dplus[3][2]*sinps + dcross[3][2]*cosps)*TI[3][2] );
-                                                                                     
+
+        /* Original AET definition
         FpAI[n] = (2.0*fpx-fpy-fpz)/3.0;
         FcAI[n] = (2.0*fcx-fcy-fcz)/3.0;
                                                                                      
         FpEI[n] = (fpz-fpy)/sq3;
-        FcEI[n] = (fcz-fcy)/sq3;
+        FcEI[n] = (fcz-fcy)/sq3;*/
         
+        
+        /* LDC's AET definition */
+        FpAI[n] = (fpz-fpx)*0.707106781186547;
+        FcAI[n] = (fcz-fcx)*0.707106781186547;
+        
+        FpEI[n] = (fpx-2*fpy+fpz)*0.408248290463863;
+        FcEI[n] = (fcx-2*fcy+fcz)*0.408248290463863;
         
     }
 
@@ -5126,5 +4508,423 @@ void RAantenna(double *params, int NF, double *TF, double *FF, double *xi, doubl
     
     return;
 }
+
+void update(struct MBH_Data *dat, struct Het *het, int typ, int k, int ll, double *logLx, double **paramx, double **paramy, double **sx, double **sy, double *min, double *max, int *who, double *heat, double ***history, int NH, double **ejump, double ***evec, int **cv, int **av, gsl_rng *r)
+{
+    int q, i, j;
+    int fstat;
+    double qx, qy, tx, nhy;
+    double alpha, beta, pDx, pDy, H;
+    double logLy, eta, leta, pMcMx, pMcMy, lglx;
+    double lm1, lm2, chi1, chi2;
+    int flag;
+    double cth, phi;
+    double x, y;
+    double Lf;
+    double *jump, *zv;
+    double *u;
+    
+    // set to 1 to use Fstat likelihood
+    fstat = 0;
+    
+    u = double_vector(5);
+    
+    jump = double_vector(NI);
+    zv = double_vector(NI);
+    
+    q = who[k];
+    
+    qx = qy = 0.0;    // log proposal densities
+    
+    if(typ == 0) // fisher jump
+    {
+        
+        // pick an eigendirection to jump in
+        beta = gsl_rng_uniform(r);
+        i = (int)(beta*(NParams));
+        // draw the jump size
+        beta = sqrt(heat[k])*ejump[q][i]*gsl_ran_gaussian(r,1.0);
+        for(j = 0; j < NParams; j++) paramy[q][j] = paramx[q][j]+beta*evec[q][i][j];
+        
+        tx = -1.0;
+    }
+    else if(typ == 1)// differential evolution
+    {
+        
+        // the history file is kept for each temperature
+        
+        de_jump(paramx[q], paramy[q], history[k], NH, NParams, r);
+        
+        tx = Tmerger(paramx[q],paramx[q][5]);
+        
+    }
+    else if(typ == 2)// big sky
+    {
+             beta = gsl_rng_uniform(r);
+             if(beta > 0.7)
+             {
+                 cth = -1.0+2.0*gsl_rng_uniform(r);
+                 phi = TPI*gsl_rng_uniform(r);
+             }
+             else if (beta > 0.3)
+             {
+                 cth = paramx[q][7] + gsl_ran_gaussian(r,0.1);
+                 phi = paramx[q][8] + gsl_ran_gaussian(r,0.1);
+             }
+             else
+             {
+                 cth = paramx[q][7] + gsl_ran_gaussian(r,0.05);
+                 phi = paramx[q][8] + gsl_ran_gaussian(r,0.05);
+             }
+             
+             if(phi < 0.0) phi += TPI;
+             if(phi > TPI) phi -= TPI;
+        
+                paramy[q][7] = cth;
+                paramy[q][8] = phi;
+
+        if(fabs(cth) < 1.0)
+          {
+        
+        int *pmap;
+        double **Fish;
+        double *params;
+        double **Svec;
+        double *Sval;
+              
+        Svec = double_matrix(4,4);
+        Sval = double_vector(4);
+        
+        pmap = (int*)malloc(sizeof(int)* (NParams));
+        Fish = double_matrix(4,4);
+        params = (double*)malloc(sizeof(double)* (NParams));
+        
+        pmap[0] = pmap[1] = pmap[2] = pmap[3] = -1;
+        pmap[5] = pmap[7] = pmap[8] = -1;
+        pmap[4] = 0;
+        pmap[6] = 1;
+        pmap[9] = 2;
+        pmap[10] = 3;
+        
+        
+        for(j = 0; j < NParams; j++) params[j] = paramx[q][j];
+        tx = -1.0;  // time offset will be at correct value, no need to maximize
+             
+        lglx = Fstat_het(dat, het, ll, params, sx[q], tx);
+        
+        // The signal is invariant under these shifts. Find out which one gives
+        // the smallest parameter deltas
+        j = 0;
+        u[0] = fabs(params[4]-paramx[q][4]) + fabs(params[9]-paramx[q][9]);
+        u[1] = fabs(params[4]+PI/2-paramx[q][4]) + fabs(params[9]+PI/2-paramx[q][9]);
+        u[2] = fabs(params[4]+PI/2-paramx[q][4]) + fabs(params[9]-PI/2-paramx[q][9]);
+        u[3] = fabs(params[4]-PI/2-paramx[q][4]) + fabs(params[9]+PI/2-paramx[q][9]);
+        u[4] = fabs(params[4]-PI/2-paramx[q][4]) + fabs(params[9]-PI/2-paramx[q][9]);
+        
+        j = 0;
+        y = u[0];
+        for (i=1; i< 5; i++)
+        {
+           if(u[i] < y)
+            {
+                y = u[i];
+                j = i;
+            }
+        }
+        
+        if(j == 1)
+        {
+            params[4] += PI/2;
+            params[9] += PI/2;
+        }
+        
+        if(j == 2)
+        {
+            params[4] += PI/2;
+            params[9] -= PI/2;
+        }
+        
+        if(j == 3)
+        {
+            params[4] -= PI/2;
+            params[9] += PI/2;
+        }
+        
+        if(j == 4)
+        {
+            params[4] -= PI/2;
+            params[9] -= PI/2;
+        }
+        
+        //FisherSub(dat, ll, pmap, params, Fish);
+        FisherSubHet(dat, het, ll, pmap, params, Fish);
+        
+        qx = 0.0;
+        for (i=0; i< NParams; i++)
+        {
+            if(pmap[i] > -1)
+            {
+              for (j=0; j< NParams; j++)
+               {
+                if(pmap[j] > -1) qx -= 0.5*Fish[pmap[i]][pmap[j]]*(paramx[q][i]-params[i])*(paramx[q][j]-params[j]);
+               }
+            }
+        }
+        
+         //y = logLx[q]-lglx;
+        //printf("%f %f\n", y, qx);
+        
+        x = det(Fish,4)/(heat[k]*heat[k]*heat[k]*heat[k]);
+        
+        qx /= heat[k];
+        
+       // printf("%f %f\n", qx, 0.5*log(x));
+        
+        qx += 0.5*log(x);
+        
+        
+        for(j = 0; j < NParams; j++) params[j] = paramx[q][j];
+        params[7] = cth;
+        params[8] = phi;
+        
+        tx = Tmerger(paramx[q],paramx[q][5]);
+             
+        Lf = Fstat_het(dat, het, ll, params, sx[q], tx);
+        
+        //FisherSub(dat, ll, pmap, params, Fish);
+        FisherSubHet(dat, het, ll, pmap, params, Fish);
+        
+        FisherEvec(Fish, Sval, Svec, 4);
+        
+        for(j = 0; j < NParams; j++) paramy[q][j] = params[j];
+        
+        // pick an eigendirection to jump in
+        beta = gsl_rng_uniform(r);
+        i = (int)(beta*4);
+        // draw the jump size
+        beta = sqrt(heat[k])*Sval[i]*gsl_ran_gaussian(r,1.0);
+        for(j = 0; j < NParams; j++)
+        {
+          if(pmap[j] > -1) paramy[q][j] = params[j]+beta*Svec[i][pmap[j]];
+        }
+        
+        qy = 0.0;
+        for (i=0; i< NParams; i++)
+        {
+            if(pmap[i] > -1)
+            {
+                for (j=0; j< NParams; j++)
+                {
+                    if(pmap[j] > -1) qy -= 0.5*Fish[pmap[i]][pmap[j]]*(paramy[q][i]-params[i])*(paramy[q][j]-params[j]);
+                }
+            }
+        }
+        
+        //printf("%f %f\n", v-w, qy);
+        
+        x = det(Fish,4)/(heat[k]*heat[k]*heat[k]*heat[k]);
+        
+        qy /= heat[k];
+        
+        // printf("%f %f\n", qy, 0.5*log(x));
+        
+        qy += 0.5*log(x);
+        
+       // printf("%f %f\n", qx, qy);
+        
+       // printf("%f %f %f %f %f ", qx, qy, lglx, logLx[q], Lf);
+        
+        
+        // Need to include a Jacobian that accounts for the deteministic time mapping.
+        // The Tmerger function is used to re-set tc so that the merger occurs at the
+        // same time in the detector. Depending on the sky location, the time range dt
+        // mapped to by a unit dcostheta dphi around the reference location will be different.
+        
+        // Test were unclear on wether this kind of term was needed
+        
+        // tvol is the time volume surrounding theta, phi
+        //qy += log(tvol(paramy[q]));
+        //qx += log(tvol(paramx[q]));
+        
+        
+        // To cover the full range, apply a pi shift to 2psi and 2phic
+        beta = gsl_rng_uniform(r);
+        if(beta > 0.5)
+        {
+            paramy[q][4] += PI/2.0;
+            paramy[q][9] += PI/2.0;
+        }
+              
+        
+        free_double_matrix(Fish,4);
+        free(pmap);
+        free(params);
+        free_double_matrix(Svec,4);
+        free_double_vector(Sval);
+              
+          }
+        
+         
+         // Note that testing this proposal using logL=const requires is not very informative since the
+         // Ftstat likelihood mostly gets skipped since the intrinsic parameters are not close to the true.
+        
+    }
+    else  // update PSD scaling
+    {
+        beta = gsl_rng_uniform(r);
+        if(beta > 0.7)
+        {
+            x = 0.1;
+        }
+        else if (beta > 0.3)
+        {
+            x = 0.01;
+        }
+        else
+        {
+            x = 0.001;
+        }
+        
+        for(i = 0; i < dat->Nch; i++) sy[q][i] = sx[q][i] + gsl_ran_gaussian(r,x);
+                                                  
+    }
+    
+    
+    // [0] ln Mass1  [1] ln Mass2  [2] Spin1 [3] Spin2 [4] phic [5] tc [6] ln distance
+    // [7] EclipticCoLatitude, [8] EclipticLongitude  [9] polarization, [10] inclination
+
+    if(ll == 0 || ll == 1)
+    {
+    if(paramy[q][1] > paramy[q][0])  // catch if m2 > m1 and flip
+    {
+        lm1 = paramy[q][1];
+        chi1 = paramy[q][3];
+        lm2 = paramy[q][0];
+        chi2 = paramy[q][2];
+        paramy[q][0] = lm1;
+        paramy[q][1] = lm2;
+        paramy[q][2] = chi1;
+        paramy[q][3] = chi2;
+    }
+    }
+    
+    
+    
+    cv[typ][k]++;
+    
+    // [0] ln Mass1  [1] ln Mass2  [2] Spin1 [3] Spin2 [4] phic [5] tc [6] ln distance
+    // [7] EclipticCoLatitude, [8] EclipticLongitude  [9] polarization, [10] inclination
+    
+
+    // re-map angular parameters to their proper range
+    if(paramy[q][4] > PI)   paramy[q][4] -= PI;
+    if(paramy[q][4] < 0.0)  paramy[q][4] += PI;
+    if(paramy[q][8] > TPI)  paramy[q][8] -= TPI;
+    if(paramy[q][8] < 0.0)  paramy[q][8] += TPI;
+    if(paramy[q][9] > PI)   paramy[q][9] -= PI;
+    if(paramy[q][9] < 0.0)  paramy[q][9] += PI;
+
+    
+    // check proposed values are in prior range
+    flag = 0;
+    for(i = 0; i < NParams; i++)
+    {
+        if(paramy[q][i] > max[i] || paramy[q][i] < min[i]) flag = 1;
+    }
+    
+    if(nflag == 1)
+    {
+        for(i = 0; i < dat->Nch; i++) if(sy[q][i] < 0.25) flag = 1;
+        for(i = 0; i < dat->Nch; i++) if(sy[q][i] > 4.0) flag = 1;
+    }
+     
+    
+    if(ll == 2 && flag == 0)
+    {
+     // eta cannot exceed 0.25
+     leta = (5.0/3.0)*(paramy[q][0]-paramy[q][1]);
+     if(leta > log(etamax)) flag = 1;
+    
+      // Jacobian that makes the prior flat in m1, m2.
+      if(flag == 0)
+      {
+        eta = exp(leta);
+        pMcMy = 2.0*paramy[q][1]+leta-0.5*log(1.0-4.0*eta);
+        
+        leta = (5.0/3.0)*(paramx[q][0]-paramx[q][1]);
+        eta = exp(leta);
+        pMcMx = 2.0*paramx[q][1]+leta-0.5*log(1.0-4.0*eta);
+      }
+        
+    }
+    
+    if(flag == 0)
+    {
+        // Jacobian that makes the prior flat in m1, m2.
+        // Jacobian is m1*m2, but we combine the probablities as logs
+        if(ll == 0)
+        {
+        pMcMy = log(paramy[q][0]*paramy[q][1]);
+        pMcMx = log(paramx[q][0]*paramx[q][1]);
+        }
+
+        if(ll == 1)
+        {
+        pMcMy = paramy[q][0]+paramy[q][1];
+        pMcMx = paramx[q][0]+paramx[q][1];
+        }
+        
+        logLy = 0.0;
+        nhy = 0.0;
+        
+        if(lhold == 0)
+        {
+            //logLy = Likelihood(dat, ll, paramy[q]);
+            logLy = log_likelihood_het(dat, het, ll, paramy[q], sy[q]);
+        }
+        
+    
+    // variable in MCMC is x=logD, so p(x) = dD/dx p(D) = D p(D) = D^3
+    
+    //pDx = 3.0*paramx[q][6];   // uniform in volume prior
+    //pDy = 3.0*paramy[q][6];   // uniform in volume prior
+    
+        if(ll == 0)
+        {
+        pDx = log(paramx[q][6]);   // uniform in distance prior
+        pDy = log(paramy[q][6]);   // uniform in distance prior
+        }
+        else
+        {
+        pDx = paramx[q][6];   // uniform in distance prior
+        pDy = paramy[q][6];   // uniform in distance prior
+        }
+    
+    
+    H = (logLy-logLx[q])/heat[k] + pMcMy + pDy - qy - pDx - pMcMx + qx;
+        
+   // if(typ == 2) printf("%e %e\n", qx, qy);
+    
+    
+    alpha = log(gsl_rng_uniform(r));
+
+    
+    if(H > alpha)
+    {
+        // copy over new state if accepted
+        logLx[q] = logLy;
+        for(i = 0; i < NParams; i++) paramx[q][i] = paramy[q][i];
+        if(nflag == 1) for(i = 0; i < dat->Nch; i++) sx[q][i] = sy[q][i];
+        av[typ][k]++;
+    }
+        
+    }
+    
+    free_double_vector(u);
+    free_double_vector(jump);
+    free_double_vector(zv);
+    
+}
+
 
 

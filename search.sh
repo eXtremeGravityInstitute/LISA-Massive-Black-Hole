@@ -2,7 +2,7 @@
 
 # Needs start and end segs
 
-clang -Xpreprocessor -fopenmp -lomp -w -o search search.c IMRPhenomD_internals.c IMRPhenomD.c -lgsl -lgslcblas  -lm
+clang -Xpreprocessor -fopenmp -lomp -O3 -w -o search search.c IMRPhenomD_internals.c IMRPhenomD.c -lgsl -lgslcblas  -lm
 
 segs=$1
 sege=$2
@@ -13,7 +13,7 @@ echo "# end =" $sege
 for ((j=segs;j<=sege;j++))
 do
 echo $j
-./search $j
+./search $j $j
 done
 
 
