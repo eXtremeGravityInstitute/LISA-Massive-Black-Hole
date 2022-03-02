@@ -138,13 +138,13 @@ int main(int argc,char **argv)
            for(i=0; i< NS[j]; i++)
              {
                 //printf("%d %d\n", ii, jj);
-                // only keep sources that merge in a given segment
+                // only keep sources from center of a given segment
                 // only keep sources with large enough SNR
                  
                 SNRT = SNRThresh + log(Mt[ii]/1.0e5);
                 if(SNRT < SNRThresh) SNRT = SNRThresh;
             
-            if(params[ii][5] < Tend && SNR[ii] > SNRT)
+              if(params[ii][5] > Tend-0.75*Tseg && params[ii][5] < Tend-0.25*Tseg && SNR[ii] > SNRT)
                {
                    flag = 0;
                    
@@ -152,7 +152,7 @@ int main(int argc,char **argv)
                  {
                      y = fabs(params[ii][5]-paramsU[kk][5])/1.0e4;
                      z = fabs(Mc[ii]-McU[kk])/(Mc[ii]+McU[kk]);
-                     //if(y < 10.0 && z < 0.2) printf("%f %f %e %e %e %e\n", y, z, params[ii][5], paramsU[kk][5], Mc[ii], McU[kk]);
+                     if(y < 10.0 && z < 0.2) printf("%f %f %e %e %e %e\n", y, z, params[ii][5], paramsU[kk][5], Mc[ii], McU[kk]);
                     if(y < 1.0 && z < 0.2)
                     {
                         flag = 1;
@@ -188,7 +188,7 @@ int main(int argc,char **argv)
         SNRT = SNRThresh + log(Mt[ii]/1.0e5);
         if(SNRT < SNRThresh) SNRT = SNRThresh;
         
-       if(SNR[ii] > SNRT)
+       if(SNR[ii] > SNRT && params[ii][5] > Tend-0.75*Tseg)
        {
          for(k=0; k< NP; k++) paramsU[jj][k] = params[ii][k];
         // printf("%d %e\n", i, params[ii][5]);
