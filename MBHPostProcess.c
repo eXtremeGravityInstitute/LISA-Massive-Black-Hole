@@ -42,7 +42,7 @@
 
 int main(int argc,char *argv[])
 {
-    if(argc!=3)
+    if(argc!=4)
     {
         printf("Usage: mbh_post /path/to/chain/file T /path/to/output/file\n");
         return 0;
