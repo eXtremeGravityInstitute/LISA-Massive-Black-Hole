@@ -156,6 +156,7 @@ int main(int argc,char *argv[])
             hrec[n][1][j] = E_re*E_re+E_im*E_im;
         }
         j++;
+        if(j>=NH) break;
     }
     
 
