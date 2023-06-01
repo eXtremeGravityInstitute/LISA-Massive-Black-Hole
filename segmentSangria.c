@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 double cosw(double t, double Tint);
 
 #define DATASET "/obs/tdi"
-#define FILENAME "LDC2_sangria_blind_v2.h5"
+#define FILENAME "LDC2_sangria_training_v2.h5"
 
 struct TDI
 {
@@ -146,10 +146,20 @@ int main(int argc, char *argv[])
         
         //printf("%d %e\n", i, X);
         
+        /* Original TDI Conventions
         tdi->A[i] = (2.0*X-Y-Z)/3.0;
         tdi->E[i] = (Z-Y)/sqrt(3.0);
-        tdi->T[i] = (X+Y+Z)/3.0;
+        tdi->T[i] = (X+Y+Z)/3.0; */
         
+        /* LDC TDI Conventsion */
+        double invSQ2 = 0.707106781186547;
+        double invSQ6 = 0.408248290463863;
+        double invSQ3 = 0.577350269189626;
+
+        tdi->A[i] = (Z-X)*invSQ2;
+        tdi->E[i] = (X-2*Y+Z)*invSQ6;
+        tdi->T[i] = (X+Y+Z)*invSQ3;
+
     }
     
     
@@ -255,6 +265,17 @@ int main(int argc, char *argv[])
            fprintf(out,"%e %.12e %.12e %.12e\n", f, A[i], E[i], T[i]);
        }
        fclose(out);
+
+       sprintf(command, "AET_seg%d_f_NR.dat", j);
+       out = fopen(command,"w");
+       for(i=1; i< Nseg/2; i++)
+       {
+           f = (double)(i)/Tseg;
+
+           fprintf(out,"%e %.12e %.12e %.12e %.12e\n", f, A[i], A[Nseg-i], E[i], E[Nseg-i]);
+       }
+       fclose(out);
+
        
        ii += Nseg/2;  //brick pattern
        
@@ -428,22 +449,19 @@ double cosw(double t, double Tint)
 
 void tukey(double *data, double alpha, int N)
 {
-  int i, imin, imax;
-  double filter;
-  
-  imin = (int)(alpha*(double)(N-1)/2.0);
-  imax = (int)((double)(N-1)*(1.0-alpha/2.0));
-  
-    int Nwin = N-imax;
-
+    int i, imin, imax;
+    double filter;
+    
+    imin = (int)(alpha*(double)(N-1)/2.0);
+    imax = (int)((double)(N-1)*(1.0-alpha/2.0));
+    
     for(i=0; i< N; i++)
-  {
-    filter = 1.0;
-    if(i<imin) filter = 0.5*(1.0+cos(M_PI*( (double)(i)/(double)(imin)-1.0 )));
-    if(i>imax) filter = 0.5*(1.0+cos(M_PI*( (double)(i-imax)/(double)(Nwin))));
-    data[i] *= filter;
-  }
-  
+    {
+        filter = 1.0;
+        if(i < imin) filter = 0.5*(1.0+cos(M_PI*( (double)(i)/(double)(imin)-1.0 )));
+        if(i>imax)   filter = 0.5*(1.0+cos(M_PI*( (double)(N-1-i)/(double)(imin)-1.0)));
+        data[i] *= filter;
+    }
 }
 
 

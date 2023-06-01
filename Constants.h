@@ -1,11 +1,11 @@
-/****************************************************************************/
+/* ************************************************************************ */
 /*                                                                          */
 /* TITLE: Preprocessor Macros For The Galactic Background                   */
 /*                                                                          */
 /* ABSTRACT: This header file contains a number of constants used           */
 /* throughout the making of the galactic backgound realizations.            */
 /*                                                                          */
-/****************************************************************************/
+/* ************************************************************************ */
 
 
 
@@ -41,7 +41,7 @@
 #define G 6.67259e-11
 
  /* Astronomical unit (meters) */
-#define AU 1.49597870660e11
+#define au 1.49597870660e11
 
  /* Number of meters in a parsec */
 #define pc 3.0856775807e16
@@ -56,7 +56,7 @@
 #define Msun 1.9889e30
 
 /* Mass of the Sun (s) */
-#define TSUN 4.92569043916e-6
+#define Tsun 4.92569043916e-6
 
 #define MPC 3.08568025e22       // Megaparsec in meters
 
@@ -83,7 +83,7 @@
 #define lambda0 0.0
 
  /* Orbital radius of the guiding center */
-#define Rgc (1.0*AU)
+#define Rgc (1.0*au)
 
  /* Mean arm length of the LISA detector (meters) */
 #define Larm 2.5e9
@@ -101,7 +101,7 @@
 
 #define GEOM 4.92569043916e-6
 
-#define NP 11
+#define NParams 11
 
 #define NI 6
 
@@ -124,9 +124,6 @@
 /* number of cold chains */
 #define NCC 4
 
-/* total number of chains */
-#define NC 24
-
 /* set to 1.0e-3 for v1, 0.0 for v2 */
 #define PDfref 0.0
 
@@ -137,5 +134,6 @@
 #define sflag 0
 
 #define etamin 0.05     // lower limit on the symmetric mass ratio (18:1 mass ratio)
+#define etamax 0.24999
 
 

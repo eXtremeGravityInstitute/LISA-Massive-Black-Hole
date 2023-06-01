@@ -132,7 +132,7 @@ int IMRPhenomDGenerateFD(
     if (f_max < 0.0) ERROR(PD_EDOM, "f_max must be greater than 0\n");
     if (distance <= 0.0) ERROR(PD_EDOM, "distance must be positive\n");
 
-  const double q = (m1 > m2) ? (m1 / m2) : (m2 / m1);
+  //unused: const double q = (m1 > m2) ? (m1 / m2) : (m2 / m1);
 
   //if (q > MAX_ALLOWED_MASS_RATIO) PRINT_WARNING("Warning: The model is not supported for high mass ratio, see MAX_ALLOWED_MASS_RATIO\n");
 
@@ -214,7 +214,7 @@ int IMRPhenomDGenerateh22FDAmpPhase(
     if (f_max < 0.0) ERROR(PD_EDOM, "f_max must be greater than 0\n");
     if (distance <= 0.0) ERROR(PD_EDOM, "distance must be positive\n");
 
-  const double q = (m1 > m2) ? (m1 / m2) : (m2 / m1);
+  //unused: const double q = (m1 > m2) ? (m1 / m2) : (m2 / m1);
 
   //if (q > MAX_ALLOWED_MASS_RATIO) PRINT_WARNING("Warning: The model is not supported for high mass ratio, see MAX_ALLOWED_MASS_RATIO\n");
 

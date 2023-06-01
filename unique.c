@@ -93,7 +93,7 @@ int main(int argc,char **argv)
             NST += i;
         }
     
-    params = double_matrix(NST,NP);
+    params = double_matrix(NST,NParams);
     SNR = double_vector(NST);
     Mc = double_vector(NST);
     McU = double_vector(NST);
@@ -112,7 +112,7 @@ int main(int argc,char **argv)
               in = fopen(filename,"r");
               fscanf(in,"%lf", &x);
               SNR[ii] = sqrt(2.0*x);
-              for(k=0; k< NP; k++) fscanf(in,"%lf", &params[ii][k]);
+              for(k=0; k< NParams; k++) fscanf(in,"%lf", &params[ii][k]);
               fclose(in);
               Mt[ii] = params[ii][0]+params[ii][1];
               Mc[ii] = pow((params[ii][0]*params[ii][1]),3.0/5.0)/pow((params[ii][0]+params[ii][1]),1.0/5.0);
@@ -126,7 +126,7 @@ int main(int argc,char **argv)
     
     printf("\n");
    
-      paramsU = double_matrix(NST,NP);
+      paramsU = double_matrix(NST,NParams);
       ii = 0;
       jj = 0;
     
@@ -162,13 +162,13 @@ int main(int argc,char **argv)
                             McU[kk] = Mc[ii];
                             MtU[kk] = Mt[ii];
                             WSU[kk] = WS[ii];
-                            for(k=0; k< NP; k++) paramsU[kk][k] = params[ii][k];
+                            for(k=0; k< NParams; k++) paramsU[kk][k] = params[ii][k];
                         }
                     }
                  }
                 if(flag == 0)
                 {
-                for(k=0; k< NP; k++) paramsU[jj][k] = params[ii][k];
+                for(k=0; k< NParams; k++) paramsU[jj][k] = params[ii][k];
                 McU[jj] = Mc[ii];
                 MtU[jj] = Mt[ii];
                 SNRU[jj] = SNR[ii];
@@ -190,7 +190,7 @@ int main(int argc,char **argv)
         
        if(SNR[ii] > SNRT && params[ii][5] > Tend-0.75*Tseg)
        {
-         for(k=0; k< NP; k++) paramsU[jj][k] = params[ii][k];
+         for(k=0; k< NParams; k++) paramsU[jj][k] = params[ii][k];
         // printf("%d %e\n", i, params[ii][5]);
          McU[jj] = Mc[ii];
          MtU[jj] = Mt[ii];
@@ -209,7 +209,7 @@ int main(int argc,char **argv)
     for(i=0; i< NSU; i++)
     {
        fprintf(out,"%.15e %.15e ", SNRU[i], McU[i]);
-       for(k=0; k< NP; k++) fprintf(out,"%.15e ", paramsU[i][k]);
+       for(k=0; k< NParams; k++) fprintf(out,"%.15e ", paramsU[i][k]);
        fprintf(out,"\n");
     }
     fclose(out);
